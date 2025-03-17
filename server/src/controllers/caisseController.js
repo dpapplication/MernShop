@@ -35,15 +35,15 @@ exports.ouvrirCaisse=async()=>{
 }
 exports.fermeCaisse=async()=>{
     try {
-        const isCaisse=await Caisse.findOne({isOpen:true}).sort({dateOuverture:-1})
+        const isCaisse=await Caisse.findOne({isOpen:true})
         if(!isCaisse){
             const newCaisse=await Caisse.create({soldeinitiale:0,soldefinale:0})
            return res.status(201).json(newCaisse)
         }
-        caisse.isOpen=false
-        caisse.save()
+        isCaisse.isOpen=false
+        isCaisse.save()
         
-           return res.status(201).json(newCaisse)
+           return res.status(201).json(isCaisse)
     } catch (error) {
         
     }
