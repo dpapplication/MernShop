@@ -31,6 +31,7 @@ import {
 
   import axios from 'axios';
 import { useAuth } from '../auth/authContext';
+import axiosInstance from '@/utils/axiosInstance';
 
   // Define a type for the low stock product
 interface ProductLowStock {
@@ -45,17 +46,17 @@ export default function Header() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
    const [lowStockProducts, setLowStockProducts] = useState<ProductLowStock[]>([]); // Array of products
-  const API_BASE_URL = "http://localhost:3000/api";
+  
 
    const fetchLowStockProducts = useCallback(async () => {
     try {
-      const response = await axios.get<ProductLowStock[]>(`${API_BASE_URL}/produits/`);
+      const response = await axiosInstance.get<ProductLowStock[]>(`api/produits/`);
       setLowStockProducts(response.data);
     } catch (error) {
         console.error("Error fetching low stock products:", error);
        
     }
-  }, [API_BASE_URL]); 
+  }, []); 
 
   useEffect(() => {
     fetchLowStockProducts();

@@ -1,6 +1,6 @@
 import axios, { AxiosInstance} from 'axios';
 
-const baseURL =  'http://localhost:3000/'
+const baseURL =  'https://courrierappbackend.onrender.com'
 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL,
