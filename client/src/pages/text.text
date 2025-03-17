@@ -1,0 +1,928 @@
+import axios from 'axios';
+import { useState, useEffect, useCallback } from 'react';
+import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
+import ClientForm from '@/components/clients/ClientForm';
+import ClientTable from '@/components/clients/ClientTable';
+import ProductForm from '@/components/products/ProductForm';
+import ProductTable from '@/components/products/ProductTable';
+import OrderForm from '@/components/orders/OrderForm';
+import OrderSummary from '@/components/orders/OrderSummary';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from '@/components/ui/use-toast';
+import {
+  Download,
+  FileText,
+  CreditCard,
+  Banknote,
+  Wallet,
+  Trash2,
+  File,
+  CheckCircle
+} from 'lucide-react';
+import { jsPDF } from "jspdf";
+import autoTable from 'jspdf-autotable';
+import StepperControl from '@/components/common/StepperControl';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+
+// Interfaces
+interface Client {
+  _id: string;
+  nom: string;
+  adresse: string;
+  telephone: string;
+}
+
+interface Product {
+  _id: string;
+  nom: string;
+  prix: string;
+  stock: string;
+}
+
+interface OrderItem {
+  id: string;
+  produit: string;
+  prix: string;
+  quantite: string;
+  remise: string;
+}
+
+interface Payment {
+  id: string;
+  typePaiement: string;
+  montant: string;
+  remiseGlobale: string;
+}
+
+// Composant principal
+const Index = () => {
+  const { toast } = useToast();
+
+  // State management
+  const [currentStep, setCurrentStep] = useState(0);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentForm, setPaymentForm] = useState({
+    typePaiement: '',
+    montant: '',
+    remiseGlobale: '0'
+  });
+  const [isFinalized, setIsFinalized] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null); // Pour la confirmation de suppression
+
+  // Étapes
+  const steps = [
+    "Clients",
+    "Produits et Commande",
+    "Paiement",
+    "Facture"
+  ];
+
+  // Validation de la progression
+  const canProgressToNextStep = () => {
+    switch (currentStep) {
+      case 0:
+        return selectedClient !== null;
+      case 1:
+        return products.length > 0 && orderItems.length > 0;
+      case 2:
+        const orderTotal = parseFloat(calculateOrderTotal());
+        const totalPayments = parseFloat(calculateTotalPayments());
+        return payments.length > 0 && totalPayments >= orderTotal;
+      default:
+        return true;
+    }
+  };
+
+  // Fetch clients et produits
+  const fetchClients = useCallback(async () => {
+    try {
+      const response = await axios.get<Client[]>("http://localhost:3000/api/clients/");
+      setClients(response.data);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des clients :", error);
+    }
+  }, []);
+
+  const fetchProducts = useCallback(async () => {
+    try {
+      const response = await axios.get<Product[]>("http://localhost:3000/api/produits/");
+      setProducts(response.data);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des produits :", error);
+    }
+  }, []);
+
+  // Initialisation
+  useEffect(() => {
+    fetchProducts();
+    fetchClients();
+  }, [fetchProducts, fetchClients]);
+
+  // Handlers
+  const handleAddClient = async (client: Client) => {
+    if (isFinalized) return;
+    try {
+      await axios.post("http://localhost:3000/api/clients/", client);
+      fetchClients();
+      toast({
+        title: "Client ajouté",
+        description: "Le client a été ajouté avec succès.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de l'ajout du client : " + error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteClient = async (id: string) => {
+    if (isFinalized) return;
+    try {
+      await axios.delete(`http://localhost:3000/api/clients/${id}`);
+      fetchClients();
+    } catch (error) {
+      console.error("Erreur lors de la suppression du client:", error);
+    }
+  };
+
+  const handleEditClient = async (client: Client) => {
+    if (isFinalized) return;
+    try {
+      await axios.put(`http://localhost:3000/api/clients/${client._id}`, client);
+      fetchClients();
+      toast({
+        title: "Client modifié",
+        description: "Le client a été modifié avec succès.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la modification du client : " + error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddClientToOrder = (client: Client) => {
+    if (isFinalized) return;
+    setSelectedClient(client);
+    toast({
+      title: "Client sélectionné",
+      description: `${client.nom} a été ajouté à la commande`,
+    });
+    if (currentStep === 0) {
+      setCurrentStep(1);
+    }
+  };
+
+  // Product handlers
+  const handleAddProduct = async (product: Product) => {
+    if (isFinalized) return;
+    try {
+      await axios.post("http://localhost:3000/api/produits/", product);
+      fetchProducts();
+      toast({
+        title: "Produit ajouté",
+        description: "Le produit a été ajouté avec succès.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de l'ajout du produit: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (isFinalized) return;
+    try {
+      await axios.delete(`http://localhost:3000/api/produits/${id}`);
+      fetchProducts();
+      toast({
+        title: "Produit supprimé",
+        description: "Le produit a été supprimé avec succès."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la suppression du produit: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditProduct = async (product: Product) => {
+    if (isFinalized) return;
+    try {
+      await axios.put(`http://localhost:3000/api/produits/${product._id}`, product);
+      fetchProducts();
+      toast({
+        title: "Produit modifié",
+        description: "Le produit a été modifié avec succès.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la modification du produit : " + error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSelectProduct = (product: Product) => {
+    if (isFinalized) return;
+    setSelectedProduct(product);
+  };
+
+  // Order handlers
+  const handleAddToOrder = (item: OrderItem) => {
+    if (isFinalized) return;
+    setOrderItems([...orderItems, item]);
+  };
+
+  const handleDeleteOrderItem = (id: string) => {
+    if (isFinalized) return;
+    setItemToDelete(id); // Ouvrir la boîte de dialogue de confirmation
+  };
+
+  // Payment handlers
+  const handleAddPayment = () => {
+    if (isFinalized) return;
+    if (!paymentForm.typePaiement || !paymentForm.montant) {
+      toast({
+        title: "Champs requis",
+        description: "Le type et le montant du paiement sont requis",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newPayment: Payment = {
+      id: crypto.randomUUID(),
+      ...paymentForm
+    };
+
+    setPayments([...payments, newPayment]);
+    setPaymentForm({
+      typePaiement: '',
+      montant: '',
+      remiseGlobale: paymentForm.remiseGlobale
+    });
+
+    toast({
+      title: "Paiement ajouté",
+      description: `Paiement de ${paymentForm.montant}€ ajouté`,
+    });
+  };
+
+  const handleDeletePayment = (id: string) => {
+    if (isFinalized) return;
+    setPayments(payments.filter(payment => payment.id !== id));
+  };
+
+  // Handle payment form changes
+  const handlePaymentChange = (name: string, value: string) => {
+    if (isFinalized) return;
+    setPaymentForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Navigation handlers
+  const handleNext = () => {
+    if (isFinalized) {
+      toast({
+        title: "Impossible de continuer",
+        description: "La commande a été finalisée.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (canProgressToNextStep()) {
+      setCurrentStep((prev) => prev + 1);
+    } else {
+      let message = "";
+      switch (currentStep) {
+        case 0:
+          message = "Veuillez sélectionner un client.";
+          break;
+        case 1:
+          message = "Veuillez ajouter au moins un produit et un article à la commande.";
+          break;
+        case 2:
+          message = "Le montant total des paiements doit être supérieur ou égal au montant total de la commande.";
+          break;
+        case 3:
+          message = "La facture est déjà générée.";
+          break;
+        default:
+          message = "Action non permise dans l'état actuel.";
+          break;
+      }
+      toast({
+        title: "Impossible de continuer",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePrev = () => {
+    if (isFinalized) {
+      toast({
+        title: "Impossible de revenir en arrière",
+        description: "La commande a été finalisée.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setCurrentStep((prev) => Math.max(0, prev - 1));
+  };
+
+  // Calculate order and payment totals
+  const calculateOrderTotal = () => {
+    const subtotal = orderItems.reduce((total, item) => {
+      const prix = parseFloat(item.prix);
+      const quantite = parseInt(item.quantite);
+      const remise = parseFloat(item.remise) || 0;
+      return total + (prix * quantite * (1 - remise / 100));
+    }, 0);
+
+    const remiseGlobale = parseFloat(paymentForm.remiseGlobale) || 0;
+    return (subtotal * (1 - remiseGlobale / 100)).toFixed(2);
+  };
+
+  const calculateTotalPayments = () => {
+    return payments.reduce((total, payment) => {
+      return total + parseFloat(payment.montant);
+    }, 0).toFixed(2);
+  };
+
+  const handleValidateInvoice = async () => {
+    const produits = orderItems.map(e => ({ produit: e._id, prix: e.prix, quantite: e.quantite, remise: e.remise }));
+    await axios.post(`http://localhost:3000/api/commandes/`, { clientId: selectedClient._id, produits });
+    await axios.post(`http://localhost:3000/api/transaction/`, { motif: 'facture payer', montant: calculateTotalPayments(), type: 'depot' });
+    setIsFinalized(true);
+
+    toast({
+      title: "Commande validée",
+      description: "La commande a été validée et ne peut plus être modifiée.",
+      icon: <CheckCircle className="h-4 w-4 text-green-500" />
+    });
+  };
+
+  // Facture PDF
+  const generateInvoicePDF = () => {
+    if (!selectedClient) {
+      toast({
+        title: "Erreur",
+        description: "Aucun client sélectionné.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const doc = new jsPDF();
+
+    // Facture Header
+    doc.setFontSize(20);
+    doc.text("Facture", 105, 15, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.text(`Date : ${new Date().toLocaleDateString()}`, 15, 25);
+    doc.text(`Facture N°: INV-${Date.now()}`, 15, 31);
+    doc.text(`Client : ${selectedClient.nom}`, 15, 37);
+
+    // Your Company Info
+    doc.text("Votre Entreprise", 195, 25, { align: 'right' });
+    doc.text("123 Rue de l'Exemple", 195, 31, { align: 'right' });
+    doc.text("75000 Paris, France", 195, 37, { align: 'right' });
+
+    // Client Information
+    doc.setFontSize(14);
+    doc.text("Informations du Client", 15, 50);
+    doc.setFontSize(12);
+    doc.text(`Nom: ${selectedClient.nom}`, 15, 57);
+    doc.text(`Adresse: ${selectedClient.adresse}`, 15, 63);
+    doc.text(`Téléphone: ${selectedClient.telephone}`, 15, 69);
+
+    // Order Items Table
+    const headers = [["Produit", "Quantité", "Prix unitaire", "Remise (%)", "Total"]];
+    const data = orderItems.map(item => [
+      item.produit,
+      item.quantite,
+      `${parseFloat(item.prix).toFixed(2)} €`,
+      item.remise ? `${item.remise}%` : "0%",
+      `${(parseFloat(item.prix) * parseInt(item.quantite) * (1 - (parseFloat(item.remise) || 0) / 100)).toFixed(2)} €`
+    ]);
+    data.push(["", "", "", "Total HT:", `${calculateOrderTotal()} €`]);
+
+    autoTable(doc, {
+      head: headers,
+      body: data,
+      startY: 80
+    });
+
+    // Payments Table
+    let finalY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(14);
+    doc.text("Paiements", 15, finalY);
+    finalY += 7;
+    doc.setFontSize(12);
+
+    const paymentHeaders = [["Type de Paiement", "Montant"]];
+    const paymentData = payments.map(p => [p.typePaiement, `${parseFloat(p.montant).toFixed(2)} €`]);
+
+    autoTable(doc, {
+      head: paymentHeaders,
+      body: paymentData,
+      startY: finalY,
+      headStyles: { fillColor: [230, 230, 230] },
+    });
+    let finalPaymentY = (doc as any).lastAutoTable.finalY;
+
+    const remaining = (parseFloat(calculateOrderTotal()) - parseFloat(calculateTotalPayments())).toFixed(2);
+    doc.text(`Reste à payer: ${remaining} €`, 195, finalPaymentY + 10, { align: 'right' });
+
+    return doc;
+  };
+
+  const handleGenerateAndDownloadInvoice = () => {
+    const doc = generateInvoicePDF();
+    if (doc) {
+      doc.save(`facture-${selectedClient.nom}-${Date.now()}.pdf`);
+    }
+  };
+
+  // Commande PDF
+  const handleDownloadOrder = () => {
+    if (!selectedClient) {
+      toast({
+        title: "Erreur",
+        description: "Aucun client sélectionné.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const doc = new jsPDF();
+
+    // Commande Header
+    doc.setFontSize(20);
+    doc.text("Bon de Commande", 105, 15, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 15, 25);
+    doc.text(`Commande N°: ORD-${Date.now()}`, 15, 31);
+    doc.text(`Client : ${selectedClient.nom}`, 15, 37);
+
+    // Your Company Info
+    doc.text("Votre Entreprise", 195, 25, { align: 'right' });
+    doc.text("123 Rue de l'Exemple", 195, 31, { align: 'right' });
+    doc.text("75000 Paris, France", 195, 37, { align: 'right' });
+
+    // Client Information
+    doc.setFontSize(14);
+    doc.text("Informations du Client", 15, 50);
+    doc.setFontSize(12);
+    doc.text(`Nom: ${selectedClient.nom}`, 15, 57);
+    doc.text(`Adresse: ${selectedClient.adresse}`, 15, 63);
+    doc.text(`Téléphone: ${selectedClient.telephone}`, 15, 69);
+
+    // Order Items Table
+    const headers = [["Produit", "Quantité", "Prix unitaire", "Remise (%)", "Total"]];
+    const data = orderItems.map(item => [
+      item.produit,
+      item.quantite,
+      `${parseFloat(item.prix).toFixed(2)} €`,
+      item.remise ? `${item.remise}%` : '0%',
+      `${(parseFloat(item.prix) * parseInt(item.quantite) * (1 - (parseFloat(item.remise) || 0) / 100)).toFixed(2)} €`
+    ]);
+
+    // Total row
+    data.push(["", "", "", "Total HT:", `${calculateOrderTotal()} €`]);
+
+    autoTable(doc, {
+      head: headers,
+      body: data,
+      startY: 80,
+    });
+
+    doc.save(`commande-${selectedClient.nom}-${Date.now()}.pdf`);
+
+    toast({
+      title: "Commande téléchargée",
+      description: "Le bon de commande a été téléchargé avec succès."
+    });
+  };
+
+  // Rendu des étapes
+  const renderStepContent = () => {
+    return (
+      <div className="space-y-8">
+        {currentStep === 0 && (
+          <div className="space-y-6 animate-fade-in">
+            <ClientTable
+              clients={clients}
+              onDeleteClient={handleDeleteClient}
+              onEditClient={handleEditClient}
+              onAddToOrder={handleAddClientToOrder}
+            />
+          </div>
+        )}
+
+        {currentStep === 1 && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ProductTable
+                products={products}
+                onDeleteProduct={handleDeleteProduct}
+                onEditProduct={handleEditProduct}
+                onSelectProduct={handleSelectProduct}
+              />
+              <OrderForm
+                selectedProduct={selectedProduct}
+                onAddToOrder={handleAddToOrder}
+              />
+            </div>
+            <div className="grid">
+              <OrderSummary
+                orderItems={orderItems}
+                onDeleteItem={handleDeleteOrderItem}
+              />
+            </div>
+          </div>
+        )}
+
+        {currentStep === 2 && (
+          <div className="space-y-6 animate-fade-in">
+            <Card className="glass-panel">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl">Ajouter un paiement</CardTitle>
+                <CardDescription>
+                  Total de la commande: {calculateOrderTotal()} €
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="typePaiement">Type de paiement</Label>
+                    <Select
+                      value={paymentForm.typePaiement}
+                      onValueChange={(value) => handlePaymentChange('typePaiement', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Carte">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" />
+                            <span>Carte bancaire</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="Espèces">
+                          <div className="flex items-center gap-2">
+                            <Banknote className="h-4 w-4" />
+                            <span>Espèces</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="Chèque">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            <span>Chèque</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="Virement">
+                          <div className="flex items-center gap-2">
+                            <Wallet className="h-4 w-4" />
+                            <span>Virement</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="montant">Montant (€)</Label>
+                    <Input
+                      id="montant"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Montant"
+                      value={paymentForm.montant}
+                      onChange={(e) => handlePaymentChange('montant', e.target.value)}
+                      className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="remiseGlobale">Remise globale (%)</Label>
+                    <Input
+                      id="remiseGlobale"
+                      type="number"
+                      min="0"
+                      max="100"
+                      placeholder="Remise globale"
+                      value={paymentForm.remiseGlobale}
+                      onChange={(e) => handlePaymentChange('remiseGlobale', e.target.value)}
+                      className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleAddPayment}
+                    className="w-full mt-6"
+                  >
+                    Ajouter le paiement
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-panel">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl">Paiements</CardTitle>
+                <CardDescription>
+                  Total des paiements: {calculateTotalPayments()} €
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="p-3 text-left font-medium">Type</th>
+                        <th className="p-3 text-right font-medium">Montant</th>
+                        <th className="p-3 text-right font-medium w-[70px]">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payments.length > 0 ? (
+                        payments.map((payment) => (
+                          <tr key={payment.id} className="border-b group animate-fade-in">
+                            <td className="p-3">{payment.typePaiement}</td>
+                            <td className="p-3 text-right">{payment.montant} €</td>
+                            <td className="p-3 text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeletePayment(payment.id)}
+                                className="h-8 w-8 opacity-70 group-hover:opacity-100 transition-opacity hover:text-destructive hover:opacity-100"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Supprimer</span>
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className="p-3 text-center">
+                            Aucun paiement
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {parseFloat(calculateOrderTotal()) > 0 && parseFloat(calculateTotalPayments()) > 0 && (
+                  <div className="mt-6 p-4 border rounded-md bg-muted/30">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Total commande:</span>
+                        <span className="font-medium">{calculateOrderTotal()} €</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total paiements:</span>
+                        <span className="font-medium">{calculateTotalPayments()} €</span>
+                      </div>
+                      <div className="border-t pt-2 mt-2 flex justify-between">
+                        <span>Reste à payer:</span>
+                        <span className={`font-bold ${parseFloat(calculateOrderTotal()) - parseFloat(calculateTotalPayments()) > 0
+                          ? 'text-destructive'
+                          : 'text-green-600'
+                          }`}>
+                          {(parseFloat(calculateOrderTotal()) - parseFloat(calculateTotalPayments())).toFixed(2)} €
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {currentStep === 3 && (
+          <div className="max-w-2xl mx-auto animate-fade-in space-y-6">
+            <Card className="glass-panel">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xl">Facture</CardTitle>
+                <CardDescription>
+                  Facture pour {selectedClient?.nom}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="border rounded-md p-4">
+                    <h3 className="font-medium text-lg mb-2">Client</h3>
+                    <p><span className="font-medium">Nom:</span> {selectedClient?.nom}</p>
+                    <p><span className="font-medium">Adresse:</span> {selectedClient?.adresse}</p>
+                    <p><span className="font-medium">Téléphone:</span> {selectedClient?.telephone}</p>
+                  </div>
+
+                  <div className="border rounded-md p-4">
+                    <h3 className="font-medium text-lg mb-2">Commande</h3>
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="pb-2 text-left">Produit</th>
+                          <th className="pb-2 text-right">Quantité</th>
+                          <th className="pb-2 text-right">Prix</th>
+                          <th className="pb-2 text-right">Remise</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orderItems.map((item) => {
+                          const prix = parseFloat(item.prix);
+                          const quantite = parseInt(item.quantite);
+                          const remise = parseFloat(item.remise) || 0;
+                          const total = (prix * quantite * (1 - remise / 100)).toFixed(2);
+
+                          return (
+                            <tr key={item.id} className="border-b">
+                              <td className="py-2">{item.produit}</td>
+                              <td className="py-2 text-right">{item.quantite}</td>
+                              <td className="py-2 text-right">{item.prix} €</td>
+                              <td className="py-2 text-right">{item.remise}%</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan={2} className="pt-2 text-right font-medium">Total:</td>
+                          <td className="pt-2 text-right font-bold">{calculateOrderTotal()} €</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  <div className="border rounded-md p-4">
+                    <h3 className="font-medium text-lg mb-2">Paiements</h3>
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="pb-2 text-left">Type</th>
+                          <th className="pb-2 text-right">Montant</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {payments.map((payment, index) => (
+                          <tr key={index} className="border-b">
+                            <td className="py-2">{payment.typePaiement}</td>
+                            <td className="py-2 text-right">{payment.montant} €</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td className="pt-2 text-right font-medium">Total:</td>
+                          <td className="pt-2 text-right font-bold">{calculateTotalPayments()} €</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button
+                    onClick={handleGenerateAndDownloadInvoice}
+                    className="w-full gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Télécharger la facture (PDF)
+                  </Button>
+
+                  <Button
+                    onClick={handleDownloadOrder}
+                    variant="outline"
+                    className="w-full gap-2"
+                  >
+                    <File className="h-4 w-4" />
+                    Télécharger la commande (PDF)
+                  </Button>
+
+                  {!isFinalized && (
+                    <Button
+                      onClick={handleValidateInvoice}
+                      variant="secondary"
+                      className="w-full gap-2"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Valider la commande
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col min-h-screen bg-background">
+      <Header />
+
+      <main className="flex-1 container py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-semibold tracking-tight mb-2">
+            Gestion des Commandes
+          </h1>
+          <p className="text-muted-foreground">
+            Créez et gérez vos commandes clients en toute simplicité
+          </p>
+        </div>
+
+        <div className="mb-10">
+          <StepperControl
+            currentStep={currentStep}
+            steps={steps}
+            onNext={handleNext}
+            onPrev={handlePrev}
+            canProgress={canProgressToNextStep()}
+          />
+        </div>
+
+        {renderStepContent()}
+
+        {/* Boîte de dialogue de confirmation pour la suppression */}
+        <Dialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmer la suppression</DialogTitle>
+              <DialogDescription>
+                Êtes-vous sûr de vouloir supprimer cet article de la commande ?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline">Annuler</Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (itemToDelete) {
+                    setOrderItems(orderItems.filter(item => item.id !== itemToDelete));
+                    setItemToDelete(null);
+                    toast({
+                      title: "Article supprimé",
+                      description: "L'article a été supprimé de la commande.",
+                    });
+                  }
+                }}
+              >
+                Supprimer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </main>
+
+      <Footer />
+    </div>
+  );
+};
+
+export default Index;
