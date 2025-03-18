@@ -43,7 +43,7 @@ const Caisse = () => {
     const loadClients = useCallback(async () => {
       setLoading(true); 
       try {
-        const response = await axiosInstance.get('api/commandes/payement/edit')
+        const response = await axiosInstance.get('api/paiements/')
         setPayments(response.data);
       } catch (error) {
        

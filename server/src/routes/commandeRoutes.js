@@ -8,7 +8,7 @@ router.get('/:id', commandeController.getByIdCommandes);
 router.put('/:id', commandeController.updateCommande);
 router.delete('/:id', commandeController.deleteByIdCommandes);
 router.put('/active/:id', commandeController.payerCommande);
-router.get('/payement/edit', commandeController.payenemt);
+router.put('/desactive/:id', commandeController.desactiverCommande);
 router.get('/', commandeController.getAllCommandes);
 
 module.exports = router;

@@ -1,9 +1,9 @@
 // src/db.js
 const mongoose = require('mongoose');
-
+//process.env.MONGO_URI
 const connectDB = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI, {
+        await mongoose.connect('mongodb://localhost:27017/shopyassine', {
             useNewUrlParser: true,
             useUnifiedTopology: true,
         });

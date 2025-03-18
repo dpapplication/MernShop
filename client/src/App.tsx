@@ -10,6 +10,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './components/auth/authContext';
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import CaisseList from "./pages/CaisseList";
+import OrderPaymentsPage from "./pages/OrderPaymentsPage";
 
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
           <Route path="/produits" element={<Produit />} />
           <Route path="/Commande" element={<Commande />} />
           <Route path="/caisse" element={<Caisse />} />
+          <Route path="/orders/:orderId/payments" element={<OrderPaymentsPage />} />
           <Route path="/historique" element={<CaisseList />} />
           
           <Route path="/orders/edit/:orderId" element={<OrderEditPage />} />

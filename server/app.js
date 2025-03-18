@@ -33,7 +33,7 @@ function fermerCaisse() {
 }
 
 // Planifier l'ouverture de la caisse à 8h00 chaque jour
-cron.schedule('5 00 00 * * *', () => {
+cron.schedule('5 23 8 * * *', () => {
     tran.ouvrirCaisse()
     console.log('La caisse est ouverte à', new Date().toLocaleTimeString());
 }, {
@@ -41,7 +41,7 @@ cron.schedule('5 00 00 * * *', () => {
 });
 
 // Planifier la fermeture de la caisse à 18h00 chaque jour
-cron.schedule('0 00 00 * * *', () => {
+cron.schedule('0 23 8 * * *', () => {
     tran.fermeCaisse();
     console.log('La caisse est FERME  à', new Date().toLocaleTimeString());
 }, {

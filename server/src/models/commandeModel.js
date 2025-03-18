@@ -3,9 +3,6 @@ const mongoose = require('mongoose');
 
 const commandeSchema = new mongoose.Schema({
     date: { type: Date, default: Date.now },
-    caisse:{
-        type: mongoose.Schema.Types.ObjectId, ref: 'Caisse'
-    },
     client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
     produits: [
         {
@@ -16,18 +13,10 @@ const commandeSchema = new mongoose.Schema({
         },
 
     ],
-    payments:[
-        {
-            
-            typePaiement:String,
-            montant:Number
-        }
-    ],
     remiseGlobale:Number,
     status:{
         type:Boolean,
-        defaut:false
-        
+        defaut:false 
     }
   
 });

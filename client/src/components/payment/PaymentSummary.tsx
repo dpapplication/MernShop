@@ -23,14 +23,14 @@ import {
 
 
 interface PaymentSummaryProps {
-  payments?: { typePaiement: string; montant: string }[]; // payments can be undefined.
+  payments?: { methode: string; montant: string }[]; // payments can be undefined.
 }
 
 const PaymentSummary: React.FC<PaymentSummaryProps> = ({ payments }) => {
 
   // Calculate totals for each payment type:
   const totals: Record<string, number> = {
-    'Carte bancaire': 0,
+    'Carte': 0,
     'Espèces': 0,
     'Chèque': 0,
     'Virement': 0,
@@ -38,10 +38,10 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({ payments }) => {
 
     if(payments) { // Check if payments exist before iterating
         for (const payment of payments) {
-            if (totals.hasOwnProperty(payment.typePaiement)) { //Important check for valid type.
+            if (totals.hasOwnProperty(payment.methode)) { //Important check for valid type.
                 const amount = parseFloat(payment.montant); // Parse to number
                 if (!isNaN(amount)) { // Verify it is a number.
-                   totals[payment.typePaiement] += amount; // Add to total.
+                   totals[payment.methode] += amount; // Add to total.
                 }
 
             }
