@@ -96,7 +96,7 @@ const calculateOrderSubtotal = (orderItems?: Order['produits']) => {
         const price = parseFloat(item.produit.prix.toString());
         const quantity = parseInt(item.quantite, 10);
         const discount = parseFloat(item.remise) || 0;
-        return total + (price * quantity * (1- discount/ 100));
+        return total + (price * quantity  - discount);
     }, 0)
 }
 
@@ -116,8 +116,8 @@ const calculateTotalPayments = (payments?: Order['payments']): string => {
 const calculateTotalDue = (orderItems: Order['produits'], payments: Order['payments'], globalDiscount: string = '0'): string => {
     const subtotal = calculateOrderSubtotal(orderItems);
     const totalPayments = parseFloat(calculateTotalPayments(payments));
-    const discount = parseFloat(globalDiscount) || 0; // Default to 0 if invalid
-    const discountedSubtotal = subtotal * (1 - discount / 100);
+    const discount = parseFloat(globalDiscount) || 0; 
+    const discountedSubtotal = subtotal   - discount 
     return (discountedSubtotal - totalPayments).toFixed(2);
 };
 

@@ -6,4 +6,3 @@ export { Dialog } from './dialog';
 export { Label } from './label'
 export { Select } from './select'
 export { SelectItem } from './select'
-

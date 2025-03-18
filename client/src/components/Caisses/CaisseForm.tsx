@@ -63,7 +63,7 @@ export default function ClientForm() {
 }, []);
 const fetchCaisse = useCallback(async () => {
   try {
-      const response = await axiosInstance.get("api/caisse");
+      const response = await axiosInstance.get("api/caisse/open");
       setCaisse(response.data);
       
   } catch (error) {
@@ -74,7 +74,7 @@ const fetchCaisse = useCallback(async () => {
         
         fetchClients()
         fetchCaisse()
-    }, [formData,caisse]);
+    }, [formData]);
 
   const [transactionFormData, setTransactionFormData] = useState<Partial<Transaction>>({
     type: 'depot',

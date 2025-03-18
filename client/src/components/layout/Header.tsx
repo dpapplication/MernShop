@@ -76,7 +76,7 @@ export default function Header() {
     { name: 'Produits', path: '/produits', icon: <ShoppingCart className="h-5 w-5" /> },
     { name: 'Commande', path: '/Commande', icon: <ShoppingCart className="h-5 w-5" /> },
     { name: 'caisse', path: '/caisse', icon: <ShoppingCart className="h-5 w-5" /> },
-    { name: 'Statistiques', path: '/Statistique', icon: <FileText className="h-5 w-4" /> },
+    { name: 'Historique', path: '/historique', icon: <FileText className="h-5 w-4" /> },
   ];
 
 

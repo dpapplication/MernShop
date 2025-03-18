@@ -6,6 +6,13 @@ const caisseSchema = new mongoose.Schema({
     soldefinale: { type: Number},
     dateOuverture:{type:Date, default:Date.now()},
     isOpen:{type:Boolean,default:true}
+},{
+    toObject: { virtuals: true }, toJSON: { virtuals: true }
 });
+caisseSchema.virtual('transactions', {
+    ref: 'Transaction', 
+    localField: '_id', 
+    foreignField: 'idCaisse', 
+  });
 
 module.exports = mongoose.model('Caisse', caisseSchema);

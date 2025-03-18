@@ -7,7 +7,7 @@ router.post('/', transactionController.createTransaction);
 
 // Lire toutes les transactions
 router.get('/', transactionController.getTransactions);
-
+router.get('/caisse/:id', transactionController.getTransactionByIdCaisse);
 // Lire une transaction par ID
 router.get('/:id', transactionController.getTransactionById);
 

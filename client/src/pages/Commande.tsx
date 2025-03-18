@@ -73,7 +73,7 @@ const calculateOrderSubtotal = (orderItems: Order['produits']) => {
         const price = parseFloat(item.produit.prix.toString());
         const quantity = parseInt(item.quantite);
         const discount = parseFloat(item.remise) || 0; // Handle undefined/null discount.
-        return total + (price * quantity * (1- discount/ 100));
+        return total + (price * quantity - discount);
     }, 0);
 };
 
@@ -89,8 +89,8 @@ const calculateTotalDue = (orderItems: Order['produits'], payments: Order['payme
   const subtotal = calculateOrderSubtotal(orderItems);
   const totalPayments = parseFloat(calculateTotalPayments(payments));
   const discount = parseFloat(globalDiscount) || 0;  // Handle null/undefined
-  const discountedSubtotal = subtotal * (1 - discount / 100);
-  return (discountedSubtotal - totalPayments).toFixed(2); // Format to two decimal places
+  const discountedSubtotal = subtotal ;
+  return (discountedSubtotal - (totalPayments+discount)).toFixed(2); // Format to two decimal places
 };
 // --- Component ---
 const OrderListPage = () => {
@@ -173,7 +173,7 @@ const OrderListPage = () => {
               item.quantite,
               item.produit.prix,
               `${item.remise}%`,
-              (parseFloat(item.produit.prix.toString()) * parseInt(item.quantite) * (1- (parseFloat(item.remise) || 0)/100))
+              (parseFloat(item.produit.prix.toString()) * parseInt(item.quantite)  - (parseFloat(item.remise) || 0))
          ]);
 
             const columns = ["Produit", "Quantité", "Prix Unitaire", "Remise", "Total"];
@@ -218,7 +218,7 @@ const OrderListPage = () => {
         const totalPayments = calculateTotalPayments(order.payments);
         const remainingAmount = (orderTotal - totalPayments).toFixed(2);
         const remiseGlobale = parseFloat(order.remiseGlobale || '0');
-        const discountedSubtotal = (orderTotal * (1- remiseGlobale/100 )).toFixed(2)
+        const discountedSubtotal = (orderTotal - remiseGlobale).toFixed(2)
 
        let startY = (doc as any).lastAutoTable.finalY + 15; // Cast doc to any to access lastAutoTable
         doc.setFontSize(12);
@@ -339,7 +339,7 @@ const OrderListPage = () => {
                     currentOrders.map((order) => {
                          const orderTotal = calculateOrderSubtotal(order.produits);
                          const totalPayments = calculateTotalPayments(order.payments);
-                         const remainingAmount = (orderTotal - totalPayments).toFixed(2);
+                         const remainingAmount = (orderTotal - totalPayments-order.remiseGlobale).toFixed(2);
 
                         return (
                         <TableRow key={order._id}>
@@ -487,7 +487,7 @@ const OrderListPage = () => {
                                                       ? 'text-green-600'  // Correct class
                                                       : 'text-red-500'     // Correct class
                                                   }`}>
-                                                        {formatCurrency(calculateTotalDue(selectedOrder.produits,selectedOrder.payments,selectedOrder.remiseGlobale))}
+                                                        {calculateTotalDue(selectedOrder.produits,selectedOrder.payments,selectedOrder.remiseGlobale)}
                                                   </span>
                                             </div>
                                             </div>

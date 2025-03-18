@@ -72,3 +72,17 @@ exports.deleteTransaction = async (req, res) => {
         res.status(500).json({ message: 'Erreur lors de la suppression de la transaction', error });
     }
 };
+
+exports.getTransactionByIdCaisse = async (req, res) => {
+    try {
+        
+        const transaction = await Transaction.find({idCaisse:req.params.id})
+        if (!transaction) {
+            return res.status(404).json({ message: 'Transaction non trouvée' });
+        }
+        
+        res.status(200).json(transaction);
+    } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la récupération de la transaction', error });
+    }
+};

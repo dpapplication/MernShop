@@ -9,6 +9,7 @@ import LoginPage from "./pages/Login";
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './components/auth/authContext';
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import CaisseList from "./pages/CaisseList";
 
 
 function App() {
@@ -28,7 +29,7 @@ function App() {
           <Route path="/produits" element={<Produit />} />
           <Route path="/Commande" element={<Commande />} />
           <Route path="/caisse" element={<Caisse />} />
-          <Route path="/Statistique" element={<Statistique />} />
+          <Route path="/historique" element={<CaisseList />} />
           
           <Route path="/orders/edit/:orderId" element={<OrderEditPage />} />
           </Route>
