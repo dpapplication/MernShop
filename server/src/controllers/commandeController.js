@@ -7,7 +7,7 @@ const Caisse =require('../models/caisseModel');
 const caisseModel = require('../models/caisseModel');
 
 exports.createCommande = async (req, res) => {
-    const { clientId, produits ,remiseGlobale} = req.body;
+    const { clientId, produits ,remiseGlobale,services} = req.body;
     console.log(req.body)
     try {
         // Vérifier si le client existe
@@ -19,6 +19,7 @@ exports.createCommande = async (req, res) => {
         const commande = new Commande({
             client: clientId,
             produits,
+            services,
             remiseGlobale,
             
         });
@@ -37,7 +38,7 @@ exports.createCommande = async (req, res) => {
 
 exports.getAllCommandes = async (req, res) => {
     try {
-        const commandes = await Commande.find().populate('client produits.produit');
+        const commandes = await Commande.find().populate('client produits.produit services.service');
         res.json(commandes);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -46,7 +47,7 @@ exports.getAllCommandes = async (req, res) => {
 
 exports.getByIdCommandes = async (req, res) => {
     try {
-        const commandes = await Commande.findById(req.params.id).populate('client produits.produit');
+        const commandes = await Commande.findById(req.params.id).populate('client produits.produit services.service');
         res.json(commandes);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -77,7 +78,7 @@ exports.updateCommande = async (req, res) => {
 
 exports.deleteByIdCommandes = async (req, res) => {
     try {
-        const commande = await Commande.findByIdAndDelete(req.params.id).populate('client produits.produit');
+        const commande = await Commande.findByIdAndDelete(req.params.id).populate('client produits.produit services.service');
         if (!commande) {
             return res.status(404).json({ message: 'commande non trouvé' });
         }  
@@ -89,7 +90,7 @@ exports.deleteByIdCommandes = async (req, res) => {
 
 exports.payerCommande = async (req, res) => {
     try {
-        const commande = await Commande.findById(req.params.id).populate('client produits.produit');
+        const commande = await Commande.findById(req.params.id).populate('client produits.produit services.service');
         if (!commande) {
             return res.status(404).json({ message: 'commande non trouvé' });
         }  
@@ -106,7 +107,7 @@ exports.payerCommande = async (req, res) => {
 
 exports.desactiverCommande = async (req, res) => {
     try {
-        const commande = await Commande.findById(req.params.id).populate('client produits.produit');
+        const commande = await Commande.findById(req.params.id).populate('client produits.produit services.service');
         if (!commande) {
             return res.status(404).json({ message: 'commande non trouvé' });
         }  

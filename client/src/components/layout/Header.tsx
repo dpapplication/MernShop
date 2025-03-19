@@ -73,6 +73,7 @@ export default function Header() {
   const navItems = [
     { name: 'Accueil', path: '/dashbord', icon: <Home className="h-5 w-5" /> },
     { name: 'Clients', path: '/clients', icon: <Users className="h-5 w-5" /> },
+    { name: 'service', path: '/service', icon: <Users className="h-5 w-5" /> },
     { name: 'Produits', path: '/produits', icon: <ShoppingCart className="h-5 w-5" /> },
     { name: 'Commande', path: '/Commande', icon: <ShoppingCart className="h-5 w-5" /> },
     { name: 'caisse', path: '/caisse', icon: <ShoppingCart className="h-5 w-5" /> },

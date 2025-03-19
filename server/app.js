@@ -18,7 +18,7 @@ const caisseRoutes = require('./src/routes/caisseRoutes');
 const auth=require('./src/routes/authRoutes')
 const transactionRoutes = require('./src/routes/transactionRoutes');
 const tran=require('./src/controllers/caisseController')
-
+const servie =require('./src/routes/serviceRoutes')
 
 // Fonction pour ouvrir la caisse
 function ouvrirCaisse() {
@@ -62,6 +62,7 @@ app.use('/api/commandes', commandeRoutes);
 app.use('/api/factures', factureRoutes);
 app.use('/api/paiements', paiementRoutes);
 app.use('/api/caisse', caisseRoutes);
+app.use('/api/services', servie);
 app.use('/api/transaction', transactionRoutes);
 
 

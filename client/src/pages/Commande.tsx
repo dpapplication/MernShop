@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Printer, Pencil, Trash2, CheckCircle, Eye, CreditCard } from 'lucide-react'; // Added CreditCard icon
+import { Printer, Pencil, Trash2, CheckCircle, Eye, CreditCard } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/layout/Header';
@@ -32,17 +32,23 @@ interface Order {
         quantite: number;
         remise: number;
     }[];
+    services: { // Added services
+      service: {
+        _id: string;
+        nom: string;
+        prix: number;
+      };
+      remise: number;
+    }[];
     remiseGlobale?: number;
     date: string;
     status: boolean;
 }
 
-// Interface for Payment
-interface Payment {
-    _id: string;
-    methode: string;
-    montant: number;
-    caisse: string; // Assuming caisse has a string ID
+interface Payment { // Keep Payment interface
+  _id: string;
+  montant: number;
+  methode: string;
 }
 
 // --- Helper Functions ---
@@ -50,17 +56,23 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
 };
 
-const calculateOrderSubtotal = (orderItems: Order['produits']): number => {
+const calculateProductsSubtotal = (orderItems: Order['produits'] | undefined): number => {
     if (!orderItems) return 0;
     return orderItems.reduce((total, item) => {
         return total + (item.produit.prix * item.quantite - (item.remise || 0));
     }, 0);
 };
+//Calculate subtotal for service
+const calculateServicesSubtotal = (orderServices: Order['services'] | undefined): number => {
+    if (!orderServices) return 0;
+    return orderServices.reduce((total, item) => {
+        return total + (item.service.prix - (item.remise || 0));
+    }, 0);
+};
 
-// Keep calculateTotalPayments as async
 const calculateTotalPayments = async (orderId: string): Promise<number> => {
   try {
-    const response = await axiosInstance.get(`/api/paiements/commande/${orderId}`);
+    const response = await axiosInstance.get<Payment[]>(`/api/paiements/commande/${orderId}`);
     const payments = response.data;
 
     if (!payments || payments.length === 0) {
@@ -70,14 +82,13 @@ const calculateTotalPayments = async (orderId: string): Promise<number> => {
     return payments.reduce((total, payment) => total + payment.montant, 0);
   } catch (error) {
     console.error("Error fetching payments:", error);
-    return 0; // Return 0 on error
+    return 0;
   }
 };
 
-
-
-const calculateTotalDue = (subtotal: number, totalPayments: number, globalDiscount: number = 0): string => {
-    const discountedSubtotal = subtotal - globalDiscount;
+const calculateTotalDue = (productsSubtotal:number, servicesSubtotal:number, totalPayments: number, globalDiscount: number = 0): string => {
+   const total = productsSubtotal + servicesSubtotal;
+    const discountedSubtotal = total - globalDiscount;
     return (discountedSubtotal - totalPayments).toFixed(2);
 };
 
@@ -91,7 +102,6 @@ const OrderListPage = () => {
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
-
     // State to hold payments for the selected order
     const [selectedOrderPayments, setSelectedOrderPayments] = useState<Payment[]>([]);
 
@@ -115,139 +125,154 @@ const OrderListPage = () => {
 
 
 
-    const handlePdf = (order: Order) => {
+   const handlePdf = (order: Order) => {
         if (!order) return;
         const doc = new jsPDF();
 
-        // Company info (replace with your actual info)
         doc.setFontSize(20);
         doc.text("Le Mobile", 14, 20);
         doc.setFontSize(10);
         doc.text("57 Avenue Alphonse Denis", 14, 27);
         doc.text("83400 Hyères", 14, 34);
         doc.text("Tel:0980496621", 14, 41);
-        // Assuming you have a company logo, add it like this:
         const logoImg = new Image()
-        logoImg.src = './logo.jpeg' //  relative to the public directory
-        doc.addImage(logoImg, 'JPEG', 150, 15, 45, 45) // x, y, width, height
+        logoImg.src = './logo.jpeg'
+        doc.addImage(logoImg, 'JPEG', 150, 15, 45, 45)
 
-
-        // Title
         doc.setFontSize(20);
         doc.text("Facture", 105, 60, { align: 'center' });
 
-        // Order and client info
         doc.setFontSize(12);
         doc.text(`Order Number: ORD-${order._id.substring(order._id.length - 6)}`, 14, 75);
-        doc.text(`Date: ${order.date}`, 14, 82);  // Format this!
+        doc.text(`Date: ${order.date}`, 14, 82);
 
-        if (order.client) {
+         if (order.client) {
             doc.setFontSize(14);
-            doc.text("Information du Client:", 14, 95);
-            doc.setFontSize(11);
-            doc.text(`Nom: ${order.client.nom}`, 14, 102);
-            doc.text(`Addresse: ${order.client.adresse}`, 14, 109);
-            doc.text(`Tel: ${order.client.telephone}`, 14, 116);
+            doc.text("Client Information:", 14, 95);
+            doc.setFontSize(12);
+            doc.text(`Name: ${order.client.nom}`, 14, 102);
+            doc.text(`Address: ${order.client.adresse}`, 14, 109);
+            doc.text(`Phone: ${order.client.telephone}`, 14, 116);
         }
 
-        // --- Horizontal Line ---
         doc.setLineWidth(0.5);
-        doc.line(14, 125, 196, 125);  // (x1, y1, x2, y2)
+        doc.line(14, 125, 196, 125);
 
+        // Products Table
+        const productItems = order.produits?.map((item) => [
+              item.produit.nom,
+              item.quantite,
+              item.produit.prix,
+              `${item.remise}%`,
+              (item.produit.prix * item.quantite - (item.remise || 0))
+         ]) || [];
 
-        const items = order.produits?.map((item, index) => [
-            item.produit.nom,
-            item.quantite,
-            item.produit.prix,
-            `${item.remise}`,
-            (item.produit.prix * item.quantite - (item.remise || 0)).toFixed(2)
-        ]);
+        const productColumns = ["Produit", "Quantité", "Prix Unitaire", "Remise", "Total"];
 
-        const columns = ["Produit", "Quantité", "Prix Unitaire", "Remise", "Total"];
-
-        // Add the table with products to the PDF using jsPDF-AutoTable
         autoTable(doc, {
-            head: [columns],
-            body: items,
+            head: [productColumns],
+            body: productItems,
             startY: 130,
-            headStyles: { fillColor: [41, 128, 185] },  //  header styling
-            columnStyles: {  // Right-align numeric columns for readability.
-                1: { halign: 'center' },  // Quantity
-                2: { halign: 'center' },  // Unit Price
-                3: { halign: 'center' }, //Remise
-                4: { halign: 'center' }, // Total
+            headStyles: {fillColor: [41, 128, 185]},
+            columnStyles: {
+                1: { halign: 'right' },
+                2: { halign: 'right' },
+                3: { halign: 'right' },
+                4: { halign: 'right' },
             },
             margin: { top: 10, right: 14, bottom: 10, left: 14 },
-            theme: 'striped', // Apply a theme for styling (optional)
+            theme: 'striped',
         });
 
-        // --- Get Payments ---
-        // Fetch payments within handlePdf
+        // Services Table (if services exist)
+        if(order.services && order.services.length > 0) {
+            const serviceItems = order.services.map(item => [
+                item.service.nom,
+                item.service.prix,
+                `${item.remise}%`,
+                (item.service.prix - (item.remise || 0)) // Total for service
+            ]);
+            const serviceColumns = ["Service", "Prix", "Remise", "Total"];
+
+            let startY = (doc as any).lastAutoTable.finalY + 15;
+            autoTable(doc, {
+                head: [serviceColumns],
+                body: serviceItems,
+                startY: startY,
+                headStyles: {fillColor: [41, 128, 185]},
+                columnStyles: {
+                    1: { halign: 'right' },
+                    2: { halign: 'right' },
+                    3: { halign: 'right' }
+                },
+                margin: { top: 10, right: 14, bottom: 10, left: 14 },
+                theme: 'striped',
+            });
+        }
+
+
+         // --- Get Payments ---
         axiosInstance.get(`/api/paiements/commande/${order._id}`)
             .then(paymentsResponse => {
                 const payments = paymentsResponse.data;
-
-                // --- Payment details ---
-                if (payments && payments.length > 0) {
-                    let startY = (doc as any).lastAutoTable.finalY + 15; // Cast doc to any to access lastAutoTable
-                    doc.setFontSize(14);
-                    doc.text("Payments:", 14, startY);
-                    startY += 7;
-                    const paymentsData = payments.map((payment) => [
-                        payment.methode,
-                        formatCurrency(payment.montant), // format currency
-                    ]);
-
-                    autoTable(doc, {
-                        head: [['Payment Type', 'Amount']], //
-                        body: paymentsData, // Use data for display payments details
-                        startY: startY,
-                        headStyles: { fillColor: [41, 128, 185] },
-                        columnStyles: { 1: { halign: 'right' } },
-                        margin: { left: 14 },
-                    });
-                }
-                const orderTotal = calculateOrderSubtotal(order.produits);
-                const totalPayments = calculateTotalPayments(order._id);
-                const remainingAmount = orderTotal - totalPayments;
-                const remiseGlobale = order.remiseGlobale || 0;
-                const discountedSubtotal = (orderTotal - remiseGlobale).toFixed(2)
-
+                 // --- Payment details ---
+                if (payments && payments.length > 0){
                 let startY = (doc as any).lastAutoTable.finalY + 15; // Cast doc to any to access lastAutoTable
-                doc.setFontSize(10);
-                doc.text(`Total : ${orderTotal.toFixed(2)}€`, 196, startY, { align: 'right' });
+                doc.setFontSize(14);
+                doc.text("Payments:", 14, startY);
+                    startY+=7;
+                    const paymentsData = payments.map((payment) => [
+                    payment.methode,
+                formatCurrency(payment.montant), // format currency
+                ]);
+
+                autoTable(doc, {
+                    head: [['Payment Type', 'Amount']],
+                    body: paymentsData,
+                    startY: startY,
+                    headStyles: {fillColor: [41, 128, 185]},
+                    columnStyles: { 1: { halign: 'right' } },
+                    margin: { left: 14 },
+                });
+            }
+            const productsSubtotal = calculateProductsSubtotal(order.produits);
+            const servicesSubtotal = calculateServicesSubtotal(order.services);
+            const totalPayments = calculateTotalPayments(order._id);
+            const remiseGlobale = order.remiseGlobale || 0;
+
+            let startY = (doc as any).lastAutoTable.finalY + 15;
+                doc.setFontSize(12);
+                 doc.text(`Products Subtotal: ${formatCurrency(productsSubtotal)}`, 196, startY, { align: 'right' });
+                startY += 7;
+                doc.text(`Services Subtotal: ${formatCurrency(servicesSubtotal)}`, 196, startY, { align: 'right' });
                 startY += 7;
 
-                // Global Discount
                 if (order.remiseGlobale) {
-                    doc.text(`Remise Total: ${order.remiseGlobale.toFixed(2)}€`, 196, startY, { align: 'right' });
+                    doc.text(`Order Discount: ${order.remiseGlobale}%`, 196, startY, { align: 'right' });
                     startY += 7;
                 }
                 totalPayments.then(total => { // totalPayments is a Promise
-                    doc.text(`Total Payer: ${total.toFixed(2)}`, 196, startY, { align: 'right' });
+                    doc.text(`Total Payments: ${formatCurrency(total)}`, 196, startY, { align: 'right' });
                     startY += 7;
-                    // Add total in bold
-                    doc.setFontSize(11);
+                    doc.setFontSize(14);
                     doc.setFont('helvetica', 'bold');
-                    calculateTotalDue(orderTotal, total, order.remiseGlobale)
-                    doc.text(`Reste a payer: ${calculateTotalDue(orderTotal, total, order.remiseGlobale)}€`, 196, startY, { align: 'right' });
-                    doc.setFont('helvetica', 'normal');// Reset to normal
-                    // Footer
+                   const totalDue = calculateTotalDue(productsSubtotal, servicesSubtotal,total, order.remiseGlobale);
+                    doc.text(`Remaining Balance: ${totalDue}`, 196, startY, { align: 'right' });
+                    doc.setFont('helvetica', 'normal');
                     doc.setFontSize(10);
                     doc.text("Merci pour votre visite!", 105, 280, { align: 'center' });
                     doc.save(`invoice_${order._id}.pdf`);
 
                 });
-
-
             })
             .catch(error => {
                 console.error("Error fetching payments for PDF:", error);
                 doc.setFontSize(10);
                 doc.text("Merci pour votre visite!", 105, 280, { align: 'center' });
-                doc.save(`invoice_${order._id}.pdf`);
+                doc.save(`invoice_${order._id}.pdf`); // Still save the PDF, even with payment error
             });
     };
+
 
     const filteredOrders = useMemo(() => {
         return orders.filter(order =>
@@ -268,29 +293,29 @@ const OrderListPage = () => {
         setCurrentPage(newPage);
     };
 
-    const [totals, setTotals] = useState<{ [orderId: string]: { subtotal: number; totalPayments: number; remaining: string } }>({});
+  const [totals, setTotals] = useState<{ [orderId: string]: { productsSubtotal: number; servicesSubtotal: number; totalPayments: number; remaining: string; } }>({});
 
-    // New effect to calculate totals whenever orders change
     useEffect(() => {
         const calculateTotals = async () => {
-            const newTotals: { [orderId: string]: { subtotal: number; totalPayments: number; remaining: string } } = {};
-            for (const order of orders) {
-                const subtotal = calculateOrderSubtotal(order.produits);
-                const totalPayments = await calculateTotalPayments(order._id);
-                const remaining = calculateTotalDue(subtotal, totalPayments, order.remiseGlobale || 0); // Handle undefined
-                newTotals[order._id] = { subtotal, totalPayments, remaining };
-            }
-            setTotals(newTotals);
+        const newTotals: { [orderId: string]: { productsSubtotal: number; servicesSubtotal: number; totalPayments: number; remaining: string; } } = {};
+        for (const order of orders) {
+            const productsSubtotal = calculateProductsSubtotal(order.produits);
+            const servicesSubtotal = calculateServicesSubtotal(order.services); // Calculate service subtotal
+            const totalPayments = await calculateTotalPayments(order._id);
+            const remaining = calculateTotalDue(productsSubtotal,servicesSubtotal, totalPayments, order.remiseGlobale || 0);
+            newTotals[order._id] = { productsSubtotal, servicesSubtotal, totalPayments, remaining }; // Include servicesSubtotal
+        }
+        setTotals(newTotals);
         };
         calculateTotals();
 
     }, [orders]);
 
+
     const updateOrderStatus = useCallback(
         async (orderId: string) => {
             try {
                 await axiosInstance.put(`api/commandes/active/${orderId}`);
-                // Instead of re-fetching all orders, update the local state
                 setOrders(prevOrders =>
                     prevOrders.map(order =>
                         order._id === orderId ? { ...order, status: !order.status } : order
@@ -308,7 +333,6 @@ const OrderListPage = () => {
     const deleteOrder = useCallback(async (orderId: string) => {
         try {
             await axiosInstance.delete(`api/commandes/${orderId}`);
-            //  update the local state after a successful deletion
             setOrders(prevOrders => prevOrders.filter(order => order._id !== orderId));
             toast({ title: "Success", description: "Order deleted successfully." });
 
@@ -317,8 +341,7 @@ const OrderListPage = () => {
             toast({ title: "Error", description: "Failed to delete order.", variant: "destructive" });
         }
     }, [toast]);
-
-    // Function to fetch and set payments for the selected order
+     // Function to fetch and set payments for the selected order
     const fetchAndSetPayments = useCallback(async (orderId: string) => {
         try {
             const response = await axiosInstance.get<Payment[]>(`/api/paiements/commande/${orderId}`);
@@ -334,12 +357,13 @@ const OrderListPage = () => {
         }
     }, [toast]);
 
-    // Call fetchAndSetPayments when the dialog opens and an order is selected
+      // Call fetchAndSetPayments when the dialog opens and an order is selected
     useEffect(() => {
         if (selectedOrder) {
             fetchAndSetPayments(selectedOrder._id);
         }
     }, [selectedOrder, fetchAndSetPayments]);
+
 
     return (
         <>
@@ -365,7 +389,8 @@ const OrderListPage = () => {
                                         <TableRow>
                                             <TableHead className="whitespace-nowrap">N° Commande</TableHead>
                                             <TableHead>Client</TableHead>
-                                            <TableHead className="text-right">Total</TableHead>
+                                             <TableHead className="text-right">Total Produits</TableHead>
+                                            <TableHead className="text-right">Total Services</TableHead>
                                             <TableHead className="text-right">Paiements</TableHead>
                                             <TableHead className="text-right">Reste à payer</TableHead>
                                             <TableHead className="text-right">Status</TableHead>
@@ -374,19 +399,19 @@ const OrderListPage = () => {
                                     </TableHeader>
                                     <TableBody>
                                         {currentOrders.length > 0 ? (
-                                            currentOrders.map((order) => {
-                                                const { subtotal = 0, totalPayments = 0, remaining = '0.00' } = totals[order._id] || {};
+                                             currentOrders.map((order) => {
+                                                const { productsSubtotal = 0, servicesSubtotal = 0, totalPayments = 0, remaining = '0.00' } = totals[order._id] || {};
                                                 return (
                                                     <TableRow key={order._id}>
                                                         <TableCell className="whitespace-nowrap">
                                                             ORD-{order._id.substring(order._id.length - 6)}
                                                         </TableCell>
                                                         <TableCell>{order.client.nom}</TableCell>
-                                                        <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
+                                                        <TableCell className="text-right">{formatCurrency(productsSubtotal)}</TableCell>
+                                                        <TableCell className="text-right">{formatCurrency(servicesSubtotal)}</TableCell> {/* Display services subtotal */}
                                                         <TableCell className="text-right">{formatCurrency(totalPayments)}</TableCell>
-
                                                         <TableCell className={`text-right ${remaining === '0.00' ? 'text-green-500' : 'text-red-500'}`}>
-                                                            {formatCurrency(parseFloat(remaining))}
+                                                           {formatCurrency(parseFloat(remaining))}
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             {order.status ? (
@@ -407,7 +432,7 @@ const OrderListPage = () => {
                                                                         <Eye className="h-4 w-4" />
                                                                     </Button>
                                                                 </DialogTrigger>
-                                                                <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+                                                                 <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
                                                                     <DialogHeader>
                                                                         <DialogTitle>Détails de la Commande</DialogTitle>
                                                                         <DialogDescription>
@@ -417,12 +442,9 @@ const OrderListPage = () => {
 
                                                                         </DialogDescription>
                                                                     </DialogHeader>
-                                                                    {/* Order details */}
                                                                     {selectedOrder && (
                                                                         <div className="space-y-4">
-
-                                                                            {/* Client Information */}
-                                                                            <Card className="border rounded-md p-4">
+                                                                             <Card className="border rounded-md p-4">
                                                                                 <CardHeader>
                                                                                     <CardTitle className='text-lg'> Information Client</CardTitle>
                                                                                 </CardHeader>
@@ -433,10 +455,10 @@ const OrderListPage = () => {
                                                                                 </CardContent>
                                                                             </Card>
 
-                                                                            {/* Order Items */}
+                                                                              {/* Products Display */}
                                                                             <Card>
                                                                                 <CardHeader>
-                                                                                    <CardTitle className="text-lg">Articles de la commande</CardTitle>
+                                                                                    <CardTitle className="text-lg">Articles de la commande (Produits)</CardTitle>
                                                                                 </CardHeader>
                                                                                 <CardContent>
                                                                                     <div className="rounded-md border overflow-x-auto">
@@ -466,9 +488,41 @@ const OrderListPage = () => {
                                                                                         </Table>
                                                                                     </div>
                                                                                 </CardContent>
+                                                                              </Card>
 
-                                                                            </Card>
-                                                                              {/* Payments Display */}
+                                                                              {/* Services Display */}
+                                                                            <Card>
+                                                                                <CardHeader>
+                                                                                    <CardTitle className="text-lg">Services de la commande</CardTitle>
+                                                                                </CardHeader>
+                                                                                <CardContent>
+                                                                                    <div className="rounded-md border overflow-x-auto">
+                                                                                        <Table>
+                                                                                            <TableHeader>
+                                                                                                <TableRow>
+                                                                                                    <TableHead>Service</TableHead>
+                                                                                                    <TableHead className="text-right">Prix Unitaire</TableHead>
+                                                                                                    <TableHead className="text-right">Remise</TableHead>
+                                                                                                    <TableHead className="text-right">Total</TableHead>
+                                                                                                </TableRow>
+                                                                                            </TableHeader>
+                                                                                            <TableBody>
+                                                                                                {selectedOrder.services?.map((item) => (
+                                                                                                    <TableRow key={item.service._id}>
+                                                                                                        <TableCell>{item.service.nom}</TableCell>
+                                                                                                        <TableCell className="text-right">{formatCurrency(item.service.prix)}</TableCell>
+                                                                                                        <TableCell className="text-right">{item.remise}%</TableCell>
+                                                                                                        <TableCell className="text-right">
+                                                                                                            {formatCurrency(item.service.prix * (1 - (item.remise) / 100))}
+                                                                                                        </TableCell>
+                                                                                                    </TableRow>
+                                                                                                ))}
+                                                                                            </TableBody>
+                                                                                        </Table>
+                                                                                    </div>
+                                                                                </CardContent>
+                                                                              </Card>
+
                                                                             <Card>
                                                                                 <CardHeader>
                                                                                     <CardTitle className="text-lg">Paiements</CardTitle>
@@ -480,7 +534,7 @@ const OrderListPage = () => {
                                                                                                 <TableRow>
                                                                                                     <TableHead>Méthode</TableHead>
                                                                                                     <TableHead className="text-right">Montant</TableHead>
-                                                                                                    <TableHead>Caisse</TableHead> {/* Added Caisse column */}
+                                                                                                     <TableHead>Caisse</TableHead>
                                                                                                 </TableRow>
                                                                                             </TableHeader>
                                                                                             <TableBody>
@@ -489,7 +543,7 @@ const OrderListPage = () => {
                                                                                                         <TableRow key={payment._id}>
                                                                                                             <TableCell>{payment.methode}</TableCell>
                                                                                                             <TableCell className="text-right">{formatCurrency(payment.montant)}</TableCell>
-                                                                                                            <TableCell>{payment.caisse}</TableCell>
+                                                                                                            <TableCell>{payment._id}</TableCell>
                                                                                                         </TableRow>
                                                                                                     ))
                                                                                                 ) : (
@@ -502,38 +556,29 @@ const OrderListPage = () => {
                                                                                     </div>
                                                                                 </CardContent>
                                                                             </Card>
-                                                                              {/* Payments moved to separate page, so just link to it  
-                                                                            <Card>
-                                                                                <CardContent>
-                                                                                    <Link to={`/orders/${selectedOrder._id}/payments`}>
-                                                                                        <Button variant="outline">Voir les paiements</Button>
-                                                                                    </Link>
-                                                                                </CardContent>
-                                                                            </Card>
-                                                                            */}
 
-                                                                            <Card>
+
+                                                                             <Card>
                                                                                 <CardContent>
                                                                                     Summary
                                                                                     <div className="mt-4 p-4  rounded-md ">
                                                                                         <div className="space-y-2">
                                                                                             <div className="flex justify-between">
-                                                                                                <span>Sous-Total:</span>
-                                                                                                <span className="font-medium">{formatCurrency(calculateOrderSubtotal(selectedOrder.produits))}</span>
+                                                                                              <span>Sous-Total Produits:</span>
+                                                                                                <span className="font-medium">{formatCurrency(calculateProductsSubtotal(selectedOrder.produits))}</span>
+                                                                                            </div>
+                                                                                            <div className="flex justify-between">
+                                                                                              <span>Sous-Total Services:</span>
+                                                                                              <span className="font-medium">{formatCurrency(calculateServicesSubtotal(selectedOrder.services))}</span>
                                                                                             </div>
                                                                                             <div className="flex justify-between">
                                                                                                 <span>Remise Globale:</span>
                                                                                                 <span className="font-medium">{selectedOrder.remiseGlobale || 0}%</span>
                                                                                             </div>
-                                                                                            {/* <div className="flex justify-between"> //Removed.
-                                                                                <span>Total Paiements:</span>
-                                                                                <span className="font-medium">{formatCurrency(calculateTotalPayments(selectedOrder.payments))}</span>
-                                                                            </div> */}
-
-                                                                                            <div className="border-t pt-2 mt-2 flex justify-between">
+                                                                                             <div className="border-t pt-2 mt-2 flex justify-between">
                                                                                                 <span>Reste à payer:</span>
                                                                                                 <span className={`font-bold ${parseFloat(remaining) <= 0.001 ? 'text-green-600' : 'text-red-500'}`}>
-                                                                                                    {remaining}
+                                                                                                      {remaining}
                                                                                                 </span>
                                                                                             </div>
                                                                                         </div>
@@ -551,12 +596,10 @@ const OrderListPage = () => {
                                                                     </DialogFooter>
                                                                 </DialogContent>
                                                             </Dialog>
-                                                            {/* Edit Order Button */}
                                                             <Button variant="outline" size="icon" title="Modifier la commande" onClick={() => navigate(`/orders/edit/${order._id}`)} >
                                                                 <Pencil className="h-4 w-4" />
                                                             </Button>
 
-                                                            {/* Edit Payments Button */}
                                                             <Button
                                                                 variant="outline"
                                                                 size="icon"
@@ -566,7 +609,13 @@ const OrderListPage = () => {
                                                                 <CreditCard className="h-4 w-4" />
                                                             </Button>
 
-                                                        
+                                                            {order.status ? (
+                                                                <></>
+                                                            ) : (
+                                                                <Button variant="outline" size="icon" title="Marquer comme payée" onClick={() => updateOrderStatus(order._id)}  >
+                                                                    <CheckCircle className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
 
                                                             <Button variant="outline" size="icon" title="Imprimer la facture" onClick={() => handlePdf(order)}>
                                                                 <Printer className="h-4 w-4" />
@@ -601,7 +650,7 @@ const OrderListPage = () => {
                                             })
                                         ) : (
                                             <TableRow>
-                                                <TableCell colSpan={7} className="text-center">Aucune commande trouvée.</TableCell>
+                                                <TableCell colSpan={8} className="text-center">Aucune commande trouvée.</TableCell>
                                             </TableRow>
                                         )}
                                     </TableBody>

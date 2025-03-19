@@ -14,9 +14,7 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
-  build: {
-    outDir: 'dist', // Output directory (make sure this matches your publish directory)
-  },
+ 
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

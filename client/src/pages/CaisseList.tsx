@@ -9,20 +9,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Eye } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { useNavigate } from 'react-router-dom';
 import {
-    Dialog, DialogTrigger, DialogContent, DialogClose, DialogTitle, DialogFooter, DialogHeader
+    Dialog, DialogContent, DialogClose, DialogTitle, DialogFooter, DialogHeader
 } from "@/components/ui/dialog";
 import axiosInstance from '@/utils/axiosInstance';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr } from 'date-fns/locale'; // Import French locale
 import { Checkbox } from "@/components/ui/checkbox";
 import Header from '@/components/layout/Header';
 
 interface Caisse {
     _id: string;
     soldeinitiale: number;
-    soldefinale: number;
+    soldefinale: number | null; // Allow null for soldefinale
     dateOuverture: string;
     isOpen: boolean;
 }
@@ -35,7 +34,10 @@ interface Transaction {
     idCaisse: string;
     motif: string;
 }
-
+// --- Helper Functions ---
+const formatCurrency = (value: number) => { // Now only accepts number
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
+};
 const CaisseListPage: React.FC = () => {
     const { toast } = useToast();
     const [caisses, setCaisses] = useState<Caisse[]>([]);
@@ -44,9 +46,18 @@ const CaisseListPage: React.FC = () => {
     const [selectedCaisseId, setSelectedCaisseId] = useState<string | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const navigate = useNavigate();
 
-    // Charger les caisses
+    // Function to safely format a date string
+    const formatDate = (dateString: string) => {
+        try {
+            return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: fr });
+        } catch (error) {
+            console.error("Invalid date string:", dateString, error);
+            return "Invalid Date"; // Or some other placeholder
+        }
+    };
+
+
     const fetchCaisses = useCallback(async () => {
         setLoading(true);
         try {
@@ -64,12 +75,10 @@ const CaisseListPage: React.FC = () => {
         }
     }, [toast]);
 
-    // Charger les transactions d'une caisse spécifique
     const fetchTransactions = useCallback(async (caisseId: string) => {
         try {
             const response = await axiosInstance.get<Transaction[]>(`/api/transaction/caisse/${caisseId}`);
             setTransactions(response.data);
-            console.log(response.data)
         } catch (error) {
             console.error("Error fetching transactions:", error);
             toast({
@@ -80,30 +89,29 @@ const CaisseListPage: React.FC = () => {
         }
     }, [toast]);
 
-    // Ouvrir le dialogue et charger les transactions
-    const handleShowTransactions = async (caisseId: string) => {
-        setSelectedCaisseId(caisseId);
-        await fetchTransactions(caisseId);
-        console.log(caisseId)
-        setIsDialogOpen(true);
+     const handleShowTransactions = (caisseId: string) => {
+        setSelectedCaisseId(caisseId); // Set ID *before* fetching
+        fetchTransactions(caisseId);   // Fetch *before* opening
+        setIsDialogOpen(true);         // *Then* open
     };
 
-    // Fermer le dialogue
     const handleCloseModal = () => {
         setIsDialogOpen(false);
-        setSelectedCaisseId(null);
-        setTransactions([]);
+        setSelectedCaisseId(null); // Clear selected ID
+        setTransactions([]); // Clear transactions on close
     };
+
 
     useEffect(() => {
         fetchCaisses();
     }, [fetchCaisses]);
 
-    // Filtrer les caisses
-    const filteredCaisses = caisses.filter(caisse =>
+
+
+     const filteredCaisses = caisses.filter(caisse =>
         caisse.soldeinitiale.toString().includes(searchTerm) ||
-        caisse.soldefinale.toString().includes(searchTerm) ||
-        format(new Date(caisse.dateOuverture), "dd/MM/yyyy HH:mm", { locale: fr }).includes(searchTerm)
+        (caisse.soldefinale !== null && caisse.soldefinale.toString().includes(searchTerm)) ||  // Check for null
+        formatDate(caisse.dateOuverture).includes(searchTerm)
     );
 
     return (
@@ -111,7 +119,7 @@ const CaisseListPage: React.FC = () => {
             <Header />
             <Card className="w-full">
                 <CardHeader className="pb-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center  justify-between gap-4">
                         <CardTitle className="text-xl">Liste des Caisses</CardTitle>
                         <div className="relative w-full sm:w-auto">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -147,10 +155,12 @@ const CaisseListPage: React.FC = () => {
                                         filteredCaisses.map((caisse) => (
                                             <TableRow key={caisse._id}>
                                                 <TableCell>{caisse._id}</TableCell>
-                                                <TableCell className="text-right">{caisse.soldeinitiale.toFixed(2)} €</TableCell>
-                                                <TableCell className="text-right">{caisse.soldefinale.toFixed(2)} €</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(caisse.soldeinitiale)}</TableCell>
+                                                 <TableCell className="text-right">
+                                                    {caisse.soldefinale !== null ? formatCurrency(caisse.soldefinale) : 'N/A'}
+                                                </TableCell>
                                                 <TableCell>
-                                                    {format(new Date(caisse.dateOuverture), "dd/MM/yyyy HH:mm", { locale: fr })}
+                                                    {formatDate(caisse.dateOuverture)}
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     <Checkbox checked={caisse.isOpen} disabled />
@@ -181,11 +191,10 @@ const CaisseListPage: React.FC = () => {
                 </CardContent>
             </Card>
 
-            {/* Dialogue pour afficher les transactions */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>Transactions de la Caisse</DialogTitle>
+                        <DialogTitle>Transactions de la Caisse {selectedCaisseId}</DialogTitle>
                     </DialogHeader>
                     {transactions.length > 0 ? (
                         <Table>
@@ -204,13 +213,14 @@ const CaisseListPage: React.FC = () => {
                                         <TableCell>{transaction._id}</TableCell>
                                         <TableCell className="text-right">
                                             {transaction.type === 'depot'
-                                                ? `+${transaction.montant.toFixed(2)} €`
-                                                : `-${transaction.montant.toFixed(2)} €`}
+                                                ? `+${formatCurrency(transaction.montant)}`
+                                                : `-${formatCurrency(transaction.montant)}`
+                                            }
                                         </TableCell>
                                         <TableCell>{transaction.type}</TableCell>
                                         <TableCell>{transaction.motif}</TableCell>
                                         <TableCell>
-                                            {format(new Date(transaction.date), "dd/MM/yyyy HH:mm", { locale: fr })}
+                                            {formatDate(transaction.date)}
                                         </TableCell>
                                     </TableRow>
                                 ))}

@@ -13,6 +13,14 @@ const commandeSchema = new mongoose.Schema({
         },
 
     ],
+    services: [
+        {
+            service: { type: mongoose.Schema.Types.ObjectId, ref: 'service', required: true },
+            prix:{ type: Number, required: true },
+            remise:{ type: Number },
+        },
+
+    ],
     remiseGlobale:Number,
     status:{
         type:Boolean,

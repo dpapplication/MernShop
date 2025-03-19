@@ -11,10 +11,14 @@ import { AuthProvider } from './components/auth/authContext';
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import CaisseList from "./pages/CaisseList";
 import OrderPaymentsPage from "./pages/OrderPaymentsPage";
+import ServiceListPage from "./pages/ServiceListPage";
+import { ToastProvider } from "./components/ui/toast";
 
 
 function App() {
   return (
+    <ToastProvider>
+
     <Router>
       <AuthProvider> {/* Wrap your entire app with AuthProvider */}
         <Routes>
@@ -32,6 +36,7 @@ function App() {
           <Route path="/caisse" element={<Caisse />} />
           <Route path="/orders/:orderId/payments" element={<OrderPaymentsPage />} />
           <Route path="/historique" element={<CaisseList />} />
+          <Route path="/service" element={<ServiceListPage />} />
           
           <Route path="/orders/edit/:orderId" element={<OrderEditPage />} />
           </Route>
@@ -42,6 +47,7 @@ function App() {
         </Routes>
       </AuthProvider>
     </Router>
+    </ToastProvider>
   );
 }
 
