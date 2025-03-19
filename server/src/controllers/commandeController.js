@@ -43,7 +43,7 @@ exports.createCommande = async (req, res) => {
 
 exports.getAllCommandes = async (req, res) => {
     try {
-        const commandes = await Commande.find().populate('client produits.produit services.service');
+        const commandes = await Commande.find().populate('client produits.produit services.service').sort({date:-1});
         res.json(commandes);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -52,7 +52,7 @@ exports.getAllCommandes = async (req, res) => {
 
 exports.getByIdCommandes = async (req, res) => {
     try {
-        const commandes = await Commande.findById(req.params.id).populate('client produits.produit services.service');
+        const commandes = await Commande.findById(req.params.id).populate('client produits.produit services.service')
         res.json(commandes);
     } catch (err) {
         res.status(500).json({ message: err.message });
