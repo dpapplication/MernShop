@@ -38,6 +38,7 @@ interface Order {
             nom: string;
             prix: number;
         };
+        prix: number;
         remise: number;
     }[];
     date: string;
@@ -62,7 +63,7 @@ const calculateProductsSubtotal = (orderItems: Order['produits'] | undefined): n
 const calculateServicesSubtotal = (orderServices: Order['services'] | undefined): number => {
     if (!orderServices) return 0;
     return orderServices.reduce((total, item) => {
-        return total + (item.service.prix - (item.remise || 0));
+        return total + (item.prix - (item.remise || 0));
     }, 0);
 };
 

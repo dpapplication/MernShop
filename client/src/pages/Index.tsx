@@ -195,7 +195,7 @@ const OrderNewPage = () => {
     // Calculate the grand total, including the global discount
     const calculateGrandTotal = () => {
         const subtotal = calculateSubtotal();
-        return subtotal * (1 - globalDiscount / 100);
+        return subtotal - globalDiscount;
     };
 
     // --- Event Handlers ---
