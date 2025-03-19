@@ -40,7 +40,7 @@ function App() {
           <Route path="/historique" element={<CaisseList />} />
           <Route path="/service" element={<ServiceListPage />} />
           <Route path="/statistique" element={<StatisticsComponent />} />
-          <Route path="/orders/edit/:orderId" element={<OrderEditPage />} />
+          <Route path="/orders/edit/:id" element={<OrderEditPage />} />
           </Route>
 
            {/* Catch-all route for unmatched paths */}

@@ -54,7 +54,7 @@ interface OrderItem {
     item: Product | Service;
     quantity: number;
     discount: number;
-    customPrice: number;
+    prix: number;
 }
 
 interface Order {
@@ -64,12 +64,12 @@ interface Order {
         produit: Product;
         quantite: number;
         remise: number;
-        customPrice: number;
+        prix: number;
     }[];
     services: {
         service: Service;
         remise: number;
-        customPrice: number;
+        prix: number;
     }[];
     remiseGlobale?: number;
     date: string;
@@ -98,13 +98,14 @@ const OrderEditPage = () => {
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [dialogQuantity, setDialogQuantity] = useState<number>(1);
     const [dialogDiscount, setDialogDiscount] = useState<number>(0);
-    const [dialogCustomPrice, setDialogCustomPrice] = useState<number>(0);
+    const [dialogprix, setDialogprix] = useState<number>(0);
 
     // --- Data Fetching ---
 
     // Fetch order details
     const fetchOrder = useCallback(async () => {
         if (!id) return;
+        
         setLoading(true);
         try {
             const response = await axiosInstance.get<Order>(`api/commandes/${id}`);
@@ -118,7 +119,7 @@ const OrderEditPage = () => {
                     item: p.produit,
                     quantity: p.quantite,
                     discount: p.remise,
-                    customPrice: p.customPrice,
+                    prix: p.prix,
                 });
             });
             response.data.services.forEach((s) => {
@@ -127,7 +128,7 @@ const OrderEditPage = () => {
                     item: s.service,
                     quantity: 1,
                     discount: s.remise,
-                    customPrice: s.customPrice,
+                    prix: s.prix,
                 });
             });
             setOrderItems(transformedOrderItems);
@@ -184,7 +185,7 @@ const OrderEditPage = () => {
                 ...existingItem,
                 quantity: type === 'product' ? (existingItem.quantity || 0) + dialogQuantity : 1, // Increment quantity if product
                 discount: dialogDiscount,
-                customPrice: dialogCustomPrice,
+                prix: dialogprix,
             };
             setOrderItems(updatedOrderItems);
         } else {
@@ -194,7 +195,7 @@ const OrderEditPage = () => {
                 item,
                 quantity: type === 'product' ? dialogQuantity : 1,
                 discount: dialogDiscount,
-                customPrice: dialogCustomPrice,
+                prix: dialogprix,
             };
             setOrderItems([...orderItems, newOrderItem]);
         }
@@ -206,9 +207,9 @@ const OrderEditPage = () => {
         setSelectedService(null);
         setDialogQuantity(1);
         setDialogDiscount(0);
-        setDialogCustomPrice(0);
+        setDialogprix(0);
     
-    }, [orderItems, selectedProduct, selectedService, dialogQuantity, dialogDiscount, dialogCustomPrice]); // Dependencies for useCallback
+    }, [orderItems, selectedProduct, selectedService, dialogQuantity, dialogDiscount, dialogprix]); // Dependencies for useCallback
 
     const handleRemoveItem = (itemId: string, type: 'product' | 'service') => {
         setOrderItems(orderItems.filter((item) => !(item.item._id === itemId && item.type === type)));
@@ -224,7 +225,7 @@ const OrderEditPage = () => {
 
     const calculateSubtotal = () => {
         return orderItems.reduce((total, orderItem) => {
-            const price = orderItem.customPrice;
+            const price = orderItem.prix;
             const discountMultiplier = 1 - orderItem.discount / 100;
             const quantity = orderItem.quantity || 1;
             return total + price * quantity * discountMultiplier;
@@ -242,14 +243,14 @@ const OrderEditPage = () => {
         setSelectedProduct(product);
         setDialogQuantity(1);
         setDialogDiscount(0);
-        setDialogCustomPrice(product.prix);
+        setDialogprix(product.prix);
         setIsProductDialogOpen(true);
     };
 
     const handleOpenServiceDialog = (service: Service) => {
         setSelectedService(service);
         setDialogDiscount(0);
-        setDialogCustomPrice(service.prix);
+        setDialogprix(service.prix);
         setIsServiceDialogOpen(true);
     };
 
@@ -269,14 +270,14 @@ const OrderEditPage = () => {
                         produit: item.item._id,
                         quantite: item.quantity,
                         remise: item.discount,
-                        customPrice: item.customPrice,
+                        prix: item.prix,
                     })),
                 services: orderItems
                     .filter((item) => item.type === 'service')
                     .map((item) => ({
                         service: item.item._id,
                         remise: item.discount,
-                        customPrice: item.customPrice,
+                        prix: item.prix,
                     })),
                 remiseGlobale: globalDiscount,
             };
@@ -286,7 +287,7 @@ const OrderEditPage = () => {
             const response = await axiosInstance.put(`api/commandes/${order._id}`, updatedOrderData);
             if (response.status === 200) {
                 toast({ title: 'Succès', description: 'Commande mise à jour avec succès.' });
-                navigate(`/orders`); // back to the order list
+                navigate(`/Commande`); // back to the order list
             } else {
                 toast({ title: 'Erreur', description: 'Erreur lors de la mise à jour de la commande.', variant: 'destructive' });
             }
@@ -445,10 +446,10 @@ const OrderEditPage = () => {
                                                     <Input
                                                         type="number"
                                                         min="0"
-                                                        value={item.customPrice}
+                                                        value={item.prix}
                                                         onChange={(e) =>
                                                             handleUpdateItem(item.item._id, item.type, {
-                                                                customPrice: parseFloat(e.target.value),
+                                                                prix: parseFloat(e.target.value),
                                                             })
                                                         }
                                                         className="w-24 text-right"
@@ -469,7 +470,7 @@ const OrderEditPage = () => {
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                   {formatCurrency(item.customPrice * (item.quantity || 1) * (1 - item.discount / 100))}
+                                                   {formatCurrency(item.prix * (item.quantity || 1) * (1 - item.discount / 100))}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <Button
@@ -570,8 +571,8 @@ const OrderEditPage = () => {
                                                         id="dialog-custom-price"
                                                         type="number"
                                                         min="0"
-                                                        value={dialogCustomPrice}
-                                                        onChange={(e) => setDialogCustomPrice(Math.max(0, parseFloat(e.target.value)))}
+                                                        value={dialogprix}
+                                                        onChange={(e) => setDialogprix(Math.max(0, parseFloat(e.target.value)))}
                                                         className="col-span-2 w-32"
                                                     />
                                                 </div>
@@ -626,8 +627,8 @@ const OrderEditPage = () => {
                                                         id="dialog-custom-price-s"
                                                         type="number"
                                                         min="0"
-                                                        value={dialogCustomPrice}
-                                                        onChange={(e) => setDialogCustomPrice(Math.max(0, parseFloat(e.target.value)))}
+                                                        value={dialogprix}
+                                                        onChange={(e) => setDialogprix(Math.max(0, parseFloat(e.target.value)))}
                                                         className="col-span-2 w-32"
                                                     />
                                                 </div>

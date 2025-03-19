@@ -142,7 +142,7 @@ const OrderNewPage = () => {
             ...existingItem,
             quantity: type === 'product' ? (existingItem.quantity || 0) + dialogQuantity : 1, // Increment quantity if product
             discount: dialogDiscount,
-            customPrice: dialogCustomPrice,
+            prix: dialogCustomPrice,
         };
         setOrderItems(updatedOrderItems);
     } else {
@@ -152,7 +152,7 @@ const OrderNewPage = () => {
             item,
             quantity: type === 'product' ? dialogQuantity : 1,
             discount: dialogDiscount,
-            customPrice: dialogCustomPrice,
+            prix: dialogCustomPrice,
         };
         setOrderItems([...orderItems, newOrderItem]);
     }
@@ -185,7 +185,7 @@ const OrderNewPage = () => {
     // Calculate the subtotal of all items in the order
     const calculateSubtotal = () => {
         return orderItems.reduce((total, orderItem) => {
-            const price = orderItem.customPrice;
+            const price = orderItem.prix;
             const discountMultiplier = 1 - orderItem.discount / 100;
             const quantity = orderItem.quantity || 1; // Default to 1 if undefined (for services)
             return total + price * quantity * discountMultiplier;
@@ -237,14 +237,14 @@ const OrderNewPage = () => {
                     produit: item.item._id,
                     quantite: item.quantity,
                     remise: item.discount,
-                    prix: item.customPrice,
+                    prix: item.prix,
                 })),
             services: orderItems
                 .filter((item) => item.type === 'service')
                 .map((item) => ({
                     service: item.item._id,
                     remise: item.discount,
-                    customPrice: item.customPrice,
+                    prix: item.prix,
                 })),
             remiseGlobale: globalDiscount,
         };
