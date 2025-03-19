@@ -13,6 +13,7 @@ import CaisseList from "./pages/CaisseList";
 import OrderPaymentsPage from "./pages/OrderPaymentsPage";
 import ServiceListPage from "./pages/ServiceListPage";
 import { ToastProvider } from "./components/ui/toast";
+import StatisticsComponent from "./pages/StatisticsComponent";
 
 
 function App() {
@@ -34,10 +35,11 @@ function App() {
           <Route path="/produits" element={<Produit />} />
           <Route path="/Commande" element={<Commande />} />
           <Route path="/caisse" element={<Caisse />} />
+
           <Route path="/orders/:orderId/payments" element={<OrderPaymentsPage />} />
           <Route path="/historique" element={<CaisseList />} />
           <Route path="/service" element={<ServiceListPage />} />
-          
+          <Route path="/statistique" element={<StatisticsComponent />} />
           <Route path="/orders/edit/:orderId" element={<OrderEditPage />} />
           </Route>
 
