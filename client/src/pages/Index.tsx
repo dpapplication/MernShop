@@ -251,6 +251,7 @@ const OrderNewPage = () => {
 
         try {
             const response = await axiosInstance.post('api/commandes', orderData);
+            
             if (response.status === 201) {
                 const newOrderId = response.data._id;
                 toast({ title: 'Succès', description: 'Commande créée avec succès.' });
