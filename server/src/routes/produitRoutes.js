@@ -4,11 +4,11 @@ const router = express.Router();
 const produitController = require('../controllers/produitController');
 
 // Récupérer tous les produits
-router.get('/', produitController.getAllProduits);
+router.get('/produit/zero', produitController.ProduitMoinsZero);
 
 // Récupérer un produit par son ID
 router.get('/:id', produitController.getProduitById);
-
+router.get('/', produitController.getAllProduits);
 // Créer un nouveau produit
 router.post('/', produitController.createProduit);
 

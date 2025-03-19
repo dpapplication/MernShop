@@ -24,10 +24,15 @@ exports.createCommande = async (req, res) => {
             
         });
 
-        // Sauvegarder la commande
+        
         const newCommande = await commande.save();
 
-        // Mettre à jour le stock des produits
+        produits.forEach(async(element) => {
+            const produit = await Produit.findById(element.produit)
+            const total =produit.stock
+            produit.stock=total-element.quantite
+            produit.save()
+        });
        
 
         res.status(201).json(newCommande);
@@ -64,10 +69,21 @@ exports.updateCommande = async (req, res) => {
         if (!client) {
             return res.status(404).json({ message: 'Client non trouvé' });
         }   
-
-        const commande = await Commande.findByIdAndUpdate(req.params.id,{ client:clientId, produits ,services, remiseGlobale},{new:true})
-
-        // Mettre à jour le stock des produits
+        const commande = await Commande.findById(req.params.id)
+        commande.produits.forEach(async(element) => {
+            const produit = await Produit.findById(element.produit)
+            const total =produit.stock
+            produit.stock=total+element.quantite
+            produit.save()
+        });
+        await Commande.findByIdAndUpdate(req.params.id,{ client:clientId, produits ,services, remiseGlobale},{new:true})
+        produits.forEach(async(element) => {
+            const produit = await Produit.findById(element.produit)
+            const total =produit.stock
+            produit.stock=total-element.quantite
+            produit.save()
+        });
+        
        
 
         res.status(200).json(commande);

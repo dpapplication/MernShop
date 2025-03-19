@@ -10,7 +10,14 @@ exports.getAllProduits = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 }
-
+exports.ProduitMoinsZero = async (req, res) => {
+    try {
+        const produits = await Produit.find({stock:{$lte:0}});
+        res.json(produits);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+}
 // Récupérer un produit par son ID
 exports.getProduitById = async (req, res) => {
     try {

@@ -59,15 +59,15 @@ const PaymentSummary: React.FC<PaymentSummaryProps> = ({ payments }) => {
   return (
    <Card>
      <CardHeader>
-        <CardTitle>Payment Summary</CardTitle>
+        <CardTitle>Vue globale</CardTitle>
       </CardHeader>
       <CardContent>
        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Payment Type</TableHead>
-              <TableHead className="text-right">Amount</TableHead> {/* Right-align */}
+              <TableHead>Methode</TableHead>
+              <TableHead className="text-right">Montant</TableHead> {/* Right-align */}
             </TableRow>
           </TableHeader>
           <TableBody>

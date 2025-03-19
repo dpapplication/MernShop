@@ -18,11 +18,12 @@ exports.createPaiement = async (req, res) => {
                }
            if(methode=="Espèces"){
             const transaction=await Transaction.create({type:'depot',montant,motif:"payement facture",idCaisse:isCaisse._id})
-           }    
+            total=isCaisse.soldefinale+montant
+            isCaisse.soldefinale=total
+            isCaisse.save()
+        }    
         const payement=await Paiement.create({ commande, montant, methode ,caisse:isCaisse._id })
-        total=isCaisse.soldefinale+montant
-        isCaisse.soldefinale=total
-        isCaisse.save()
+
         res.status(201).json(payement);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -74,7 +75,15 @@ exports.getPaiementByCaisse = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
-
+exports.getPaiementByIdCaisse = async (req, res) => {
+    try {
+console.log(req.params.id)
+        const paiements = await Paiement.find({caisse:req.params.id})
+        res.json(paiements);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
 exports.editerPaiement = async (req, res) => {
     try {
        

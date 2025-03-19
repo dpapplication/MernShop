@@ -50,7 +50,7 @@ export default function Header() {
 
    const fetchLowStockProducts = useCallback(async () => {
     try {
-      const response = await axiosInstance.get<ProductLowStock[]>(`api/produits/`);
+      const response = await axiosInstance.get<ProductLowStock[]>(`api/produits//produit/zero`);
       setLowStockProducts(response.data);
     } catch (error) {
         console.error("Error fetching low stock products:", error);
