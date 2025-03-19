@@ -189,7 +189,7 @@ const OrderListPage = () => {
         if(order.services && order.services.length > 0) {
             const serviceItems = order.services.map(item => [
                 item.service.nom,
-                item.service.prix,
+                item.prix,
                 `${item.remise}%`,
                 (item.service.prix - (item.remise || 0)) // Total for service
             ]);
