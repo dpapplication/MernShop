@@ -59,18 +59,18 @@ exports.updateCommande = async (req, res) => {
     
     
     try {
-        const { clientId, produits ,remiseGlobale} = req.body;
+        const { clientId, produits ,services ,remiseGlobale} = req.body;
         const client = await Client.findById(clientId);
         if (!client) {
             return res.status(404).json({ message: 'Client non trouvé' });
         }   
 
-        const commande = await Commande.findByIdAndUpdate(req.params.id,{ client:clientId, produits ,remiseGlobale},{new:true})
+        const commande = await Commande.findByIdAndUpdate(req.params.id,{ client:clientId, produits ,services, remiseGlobale},{new:true})
 
         // Mettre à jour le stock des produits
        
 
-        res.status(201).json(commande);
+        res.status(200).json(commande);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

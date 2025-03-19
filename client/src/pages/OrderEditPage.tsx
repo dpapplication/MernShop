@@ -6,6 +6,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { useNavigate, useParams } from 'react-router-dom';
 import Header from '@/components/layout/Header';
@@ -25,7 +32,6 @@ import { Link } from 'react-router-dom';
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
 };
-
 // --- Interfaces ---
 
 interface Product {
@@ -41,7 +47,7 @@ interface Service {
     nom: string;
     prix: number;
 }
-// Interface pour le client, si elle n'existe pas déjà
+
 interface Client {
     _id: string;
     nom: string;
@@ -59,7 +65,7 @@ interface OrderItem {
 
 interface Order {
     _id: string;
-    client: Client; // Utiliser l'interface Client
+    client: Client;
     produits: {
         produit: Product;
         quantite: number;
@@ -81,12 +87,14 @@ interface Order {
 const OrderEditPage = () => {
     const { toast } = useToast();
     const navigate = useNavigate();
-    const { id } = useParams(); // Get order ID from URL
+    const { id } = useParams();
 
     // --- State ---
     const [order, setOrder] = useState<Order | null>(null);
     const [products, setProducts] = useState<Product[]>([]);
     const [services, setServices] = useState<Service[]>([]);
+    const [clients, setClients] = useState<Client[]>([]); // State for clients
+    const [selectedClient, setSelectedClient] = useState<string>(''); // State for the selected client
     const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
     const [globalDiscount, setGlobalDiscount] = useState<number>(0);
     const [loading, setLoading] = useState(true);
@@ -102,18 +110,18 @@ const OrderEditPage = () => {
 
     // --- Data Fetching ---
 
-    // Fetch order details
     const fetchOrder = useCallback(async () => {
         if (!id) return;
-        
         setLoading(true);
         try {
             const response = await axiosInstance.get<Order>(`api/commandes/${id}`);
-            setOrder(response.data);
+            const fetchedOrder = response.data;
+            setOrder(fetchedOrder);
+            setSelectedClient(fetchedOrder.client._id); // Set selected client
 
-            // Transform order data to unified OrderItem format
+            // Transform to unified OrderItem format
             const transformedOrderItems: OrderItem[] = [];
-            response.data.produits.forEach((p) => {
+            fetchedOrder.produits.forEach((p) => {
                 transformedOrderItems.push({
                     type: 'product',
                     item: p.produit,
@@ -122,7 +130,7 @@ const OrderEditPage = () => {
                     prix: p.prix,
                 });
             });
-            response.data.services.forEach((s) => {
+            fetchedOrder.services.forEach((s) => {
                 transformedOrderItems.push({
                     type: 'service',
                     item: s.service,
@@ -132,7 +140,7 @@ const OrderEditPage = () => {
                 });
             });
             setOrderItems(transformedOrderItems);
-            setGlobalDiscount(response.data.remiseGlobale || 0);
+            setGlobalDiscount(fetchedOrder.remiseGlobale || 0);
         } catch (error) {
             console.error('Error fetching order:', error);
             toast({ title: 'Erreur', description: 'Impossible de charger la commande.', variant: 'destructive' });
@@ -141,7 +149,6 @@ const OrderEditPage = () => {
         }
     }, [id, toast]);
 
-    // Fetch all products and services
     const fetchProductsAndServices = useCallback(async () => {
         try {
             const [productsResponse, servicesResponse] = await Promise.all([
@@ -160,30 +167,47 @@ const OrderEditPage = () => {
         }
     }, [toast]);
 
+    // Fetch Clients
+     const fetchClients = useCallback(async () => {
+        try {
+            const response = await axiosInstance.get<Client[]>('api/clients');
+            setClients(response.data);
+
+        } catch (error) {
+            console.error('Error fetching clients:', error);
+            toast({
+                title: 'Erreur',
+                description: 'Impossible de charger les clients.',
+                variant: 'destructive',
+            });
+        }
+    }, [toast]);
+
+
     useEffect(() => {
         fetchOrder();
         fetchProductsAndServices();
-    }, [fetchOrder, fetchProductsAndServices]);
+        fetchClients(); // Fetch clients
+    }, [fetchOrder, fetchProductsAndServices, fetchClients]);
 
     // --- Helper Functions ---
-
     const addItemToOrder = useCallback(() => {
         const item = selectedProduct || selectedService;
         if (!item) return;
-    
+
         const type = selectedProduct ? 'product' : 'service';
         const existingItemIndex = orderItems.findIndex(
             (orderItem) => orderItem.item._id === item._id && orderItem.type === type
         );
-    
+
         if (existingItemIndex > -1) {
-            // Item exists, update it
+            // Item exists, update
             const updatedOrderItems = [...orderItems];
             const existingItem = updatedOrderItems[existingItemIndex];
-    
+
             updatedOrderItems[existingItemIndex] = {
                 ...existingItem,
-                quantity: type === 'product' ? (existingItem.quantity || 0) + dialogQuantity : 1, // Increment quantity if product
+                quantity: type === 'product' ? (existingItem.quantity || 0) + dialogQuantity : 1,
                 discount: dialogDiscount,
                 prix: dialogprix,
             };
@@ -199,8 +223,7 @@ const OrderEditPage = () => {
             };
             setOrderItems([...orderItems, newOrderItem]);
         }
-    
-        // Reset dialog states
+
         setIsProductDialogOpen(false);
         setIsServiceDialogOpen(false);
         setSelectedProduct(null);
@@ -208,8 +231,8 @@ const OrderEditPage = () => {
         setDialogQuantity(1);
         setDialogDiscount(0);
         setDialogprix(0);
-    
-    }, [orderItems, selectedProduct, selectedService, dialogQuantity, dialogDiscount, dialogprix]); // Dependencies for useCallback
+    }, [orderItems, selectedProduct, selectedService, dialogQuantity, dialogDiscount, dialogprix]);
+
 
     const handleRemoveItem = (itemId: string, type: 'product' | 'service') => {
         setOrderItems(orderItems.filter((item) => !(item.item._id === itemId && item.type === type)));
@@ -254,42 +277,47 @@ const OrderEditPage = () => {
         setIsServiceDialogOpen(true);
     };
 
-        const handleUpdateOrder = async () => {
-           if (!order) return;
+    const handleUpdateOrder = async () => {
+        if (!order) return;
 
-            if(globalDiscount < 0){
-                 toast({ title: 'Erreur', description: 'La remise ne peut pas être négative.', variant: 'destructive' });
-                return;
-            }
+         if(globalDiscount < 0){
+             toast({ title: 'Erreur', description: 'La remise ne peut pas être négative.', variant: 'destructive' });
+            return;
+        }
 
-            const updatedOrderData = {
-                client: order.client._id, // Keep the same client
-                produits: orderItems
-                    .filter((item) => item.type === 'product')
-                    .map((item) => ({
-                        produit: item.item._id,
-                        quantite: item.quantity,
-                        remise: item.discount,
-                        prix: item.prix,
-                    })),
-                services: orderItems
-                    .filter((item) => item.type === 'service')
-                    .map((item) => ({
-                        service: item.item._id,
-                        remise: item.discount,
-                        prix: item.prix,
-                    })),
-                remiseGlobale: globalDiscount,
-            };
-
-
+        // Include the selected client in the updated data
+        const updatedOrderData = {
+            clientId: selectedClient, // Use selectedClient
+            produits: orderItems
+                .filter((item) => item.type === 'product')
+                .map((item) => ({
+                    produit: item.item._id,
+                    quantite: item.quantity,
+                    remise: item.discount,
+                    prix: item.prix,
+                })),
+            services: orderItems
+                .filter((item) => item.type === 'service')
+                .map((item) => ({
+                    service: item.item._id,
+                    remise: item.discount,
+                    prix: item.prix,
+                })),
+            remiseGlobale: globalDiscount,
+        };
+console.log(updatedOrderData)
         try {
-            const response = await axiosInstance.put(`api/commandes/${order._id}`, updatedOrderData);
+            const response = await axiosInstance.put(`api/commandes/${id}`, updatedOrderData);
+            console.log(response.data)
             if (response.status === 200) {
                 toast({ title: 'Succès', description: 'Commande mise à jour avec succès.' });
-                navigate(`/Commande`); // back to the order list
+                navigate(`/Commande`);
             } else {
-                toast({ title: 'Erreur', description: 'Erreur lors de la mise à jour de la commande.', variant: 'destructive' });
+                toast({
+                    title: 'Erreur',
+                    description: 'Erreur lors de la mise à jour de la commande.',
+                    variant: 'destructive',
+                });
             }
         } catch (error) {
             console.error('Error updating order:', error);
@@ -301,18 +329,15 @@ const OrderEditPage = () => {
         }
     };
 
-
-    // --- Filtered Products and Services (for the selection lists) ---
-
+    // --- Filtered Lists ---
     const filteredProducts = products.filter((product) =>
         product.nom.toLowerCase().includes(productSearchTerm.toLowerCase())
     );
-
     const filteredServices = services.filter((service) =>
         service.nom.toLowerCase().includes(serviceSearchTerm.toLowerCase())
     );
 
-    // --- JSX Rendering ---
+    // --- JSX ---
 
     if (loading) {
         return <div>Chargement...</div>;
@@ -327,10 +352,30 @@ const OrderEditPage = () => {
             <Header />
             <div className="container py-8">
                 <h1 className="text-3xl font-semibold mb-6">Modifier la Commande #{order._id}</h1>
-                  <h2 className="text-2xl  mb-6">Client: {order.client.nom}</h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Product Selection (Keep Add Product button) */}
+
+                    {/* Client Selection */}
+                    <Card>
+                        <CardHeader><CardTitle>Changer le Client</CardTitle></CardHeader>
+                        <CardContent>
+                            <Select onValueChange={setSelectedClient} value={selectedClient}>
+                                <SelectTrigger><SelectValue placeholder="Choisir un client" /></SelectTrigger>
+                                <SelectContent>
+                                    {clients.map((client) => (
+                                        <SelectItem key={client._id} value={client._id}>{client.nom}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Button variant="outline" asChild className="mt-2 w-full">
+                                <Link to="/clients/new">
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Ajouter Client
+                                </Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
+
+                    {/* Product Selection */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Ajouter des Produits</CardTitle>
@@ -366,7 +411,7 @@ const OrderEditPage = () => {
                         </CardContent>
                     </Card>
 
-                    {/* Service Selection (Keep Add Service button) */}
+                    {/* Service Selection */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Ajouter des Services</CardTitle>
@@ -387,7 +432,7 @@ const OrderEditPage = () => {
                                             onClick={() => handleOpenServiceDialog(service)}
                                         >
                                             <span>{service.nom}</span>
-                                           <span className="text-sm text-gray-500">{formatCurrency(service.prix)}</span>
+                                            <span className="text-sm text-gray-500">{formatCurrency(service.prix)}</span>
                                         </div>
                                     ))
                                 ) : (
@@ -470,7 +515,7 @@ const OrderEditPage = () => {
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                   {formatCurrency(item.prix * (item.quantity || 1) * (1 - item.discount / 100))}
+                                                     {formatCurrency(item.prix * (item.quantity || 1) * (1 - item.discount / 100))}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <Button
@@ -513,7 +558,7 @@ const OrderEditPage = () => {
                             </div>
                             <div className="border-t pt-2 mt-2 flex justify-between font-bold">
                                 <span>Total:</span>
-                                 <span>{formatCurrency(calculateGrandTotal())}</span>
+                                   <span>{formatCurrency(calculateGrandTotal())}</span>
                             </div>
                             <Button className="mt-4 w-full" onClick={handleUpdateOrder}>
                                 Mettre à Jour la Commande
@@ -600,7 +645,7 @@ const OrderEditPage = () => {
                                 {selectedService && (
                                     <>
                                         <p>Service: {selectedService.nom}</p>
-                                        <p>Prix initial: {formatCurrency(selectedService.prix)}</p>
+                                       <p>Prix initial: {formatCurrency(selectedService.prix)}</p>
                                         <div className="grid gap-4 mt-4">
                                             <div>
                                                 <div className="grid grid-cols-3 items-center gap-4">

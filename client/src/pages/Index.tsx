@@ -92,7 +92,7 @@ const OrderNewPage = () => {
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [dialogQuantity, setDialogQuantity] = useState<number>(1);
     const [dialogDiscount, setDialogDiscount] = useState<number>(0);
-    const [dialogCustomPrice, setDialogCustomPrice] = useState<number>(0);
+    const [dialogprix, setDialogprix] = useState<number>(0);
 
     // --- Data Fetching (Combined) ---
     useEffect(() => {
@@ -142,7 +142,7 @@ const OrderNewPage = () => {
             ...existingItem,
             quantity: type === 'product' ? (existingItem.quantity || 0) + dialogQuantity : 1, // Increment quantity if product
             discount: dialogDiscount,
-            prix: dialogCustomPrice,
+            prix: dialogprix,
         };
         setOrderItems(updatedOrderItems);
     } else {
@@ -152,7 +152,7 @@ const OrderNewPage = () => {
             item,
             quantity: type === 'product' ? dialogQuantity : 1,
             discount: dialogDiscount,
-            prix: dialogCustomPrice,
+            prix: dialogprix,
         };
         setOrderItems([...orderItems, newOrderItem]);
     }
@@ -164,16 +164,16 @@ const OrderNewPage = () => {
     setSelectedService(null);
     setDialogQuantity(1);
     setDialogDiscount(0);
-    setDialogCustomPrice(0);
+    setDialogprix(0);
 
-}, [orderItems, selectedProduct, selectedService, dialogQuantity, dialogDiscount, dialogCustomPrice]); // Dependencies for useCallback
+}, [orderItems, selectedProduct, selectedService, dialogQuantity, dialogDiscount, dialogprix]); // Dependencies for useCallback
 
 
     const handleRemoveItem = (itemId: string, type: 'product' | 'service') => {
         setOrderItems(orderItems.filter((item) => !(item.item._id === itemId && item.type === type)));
     };
 
-    // Update an item's properties (quantity, discount, customPrice)
+    // Update an item's properties (quantity, discount, prix)
     const handleUpdateItem = (itemId: string, type: 'product' | 'service', updates: Partial<OrderItem>) => {
         setOrderItems(
             orderItems.map((item) =>
@@ -204,14 +204,14 @@ const OrderNewPage = () => {
         setSelectedProduct(product);
         setDialogQuantity(1); // Reset quantity
         setDialogDiscount(0);
-        setDialogCustomPrice(product.prix); // Initialize with product's price
+        setDialogprix(product.prix); // Initialize with product's price
         setIsProductDialogOpen(true);
     };
 
     const handleOpenServiceDialog = (service: Service) => {
         setSelectedService(service);
         setDialogDiscount(0);
-        setDialogCustomPrice(service.prix);
+        setDialogprix(service.prix);
         setIsServiceDialogOpen(true);
     };
 
@@ -420,10 +420,10 @@ const OrderNewPage = () => {
                                                     <Input
                                                         type="number"
                                                         min="0"
-                                                        value={item.customPrice}
+                                                        value={item.prix}
                                                         onChange={(e) =>
                                                             handleUpdateItem(item.item._id, item.type, {
-                                                                customPrice: parseFloat(e.target.value),
+                                                                prix: parseFloat(e.target.value),
                                                             })
                                                         }
                                                         className="w-24 text-right"
@@ -444,7 +444,7 @@ const OrderNewPage = () => {
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    {(item.customPrice * (item.quantity || 1) * (1 - item.discount / 100)).toFixed(2)} €
+                                                    {(item.prix * (item.quantity || 1) * (1 - item.discount / 100)).toFixed(2)} €
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <Button
@@ -545,8 +545,8 @@ const OrderNewPage = () => {
                                                         id="dialog-custom-price"
                                                         type="number"
                                                         min="0"
-                                                        value={dialogCustomPrice}
-                                                        onChange={(e) => setDialogCustomPrice(Math.max(0, parseFloat(e.target.value)))}
+                                                        value={dialogprix}
+                                                        onChange={(e) => setDialogprix(Math.max(0, parseFloat(e.target.value)))}
                                                         className="col-span-2 w-32"
                                                     />
                                                 </div>
@@ -601,8 +601,8 @@ const OrderNewPage = () => {
                                                         id="dialog-custom-price-s"
                                                         type="number"
                                                         min="0"
-                                                        value={dialogCustomPrice}
-                                                        onChange={(e) => setDialogCustomPrice(Math.max(0, parseFloat(e.target.value)))}
+                                                        value={dialogprix}
+                                                        onChange={(e) => setDialogprix(Math.max(0, parseFloat(e.target.value)))}
                                                         className="col-span-2 w-32"
                                                     />
                                                 </div>
