@@ -14,7 +14,11 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
- 
+  build: {
+    outDir: 'dist', // Output directory (default is 'dist')
+    sourcemap: true, // Generate sourcemaps (useful for debugging)
+    // More build options...
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
