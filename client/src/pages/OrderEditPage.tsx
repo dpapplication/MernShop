@@ -1,761 +1,651 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Input, Label } from '@/components/ui/index';
-import { useToast } from "@/components/ui/use-toast"
-import axiosInstance from '@/utils/axiosInstance';
-import { PlusCircle, User, ShoppingBag,Box, Trash2 } from 'lucide-react'; // Added Box icon for services
-
-import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-    CardDescription
-} from "@/components/ui/card"
 import Header from '@/components/layout/Header';
-
-// --- Shadcn UI Select and Table Imports ---
+import axiosInstance from '@/utils/axiosInstance';
+import { XCircle, PlusCircle } from 'lucide-react';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import { v4 as uuidv4 } from 'uuid';
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Link } from 'react-router-dom';
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
+};
 
 // --- Interfaces ---
-interface Order {
-    _id: string;
-    client: {
-        _id: string;
-        nom: string;
-        adresse: string;
-        telephone: string;
-    };
-    produits: {
-        _id: string;
-        produit: {
-            _id: string;
-            nom: string;
-            prix: number;
-            stock: number;
-        };
-        quantite: number;
-        remise: number;
-    }[];
-    services: {  // Added services
-      _id: string;
-      service: {
-        _id: string;
-        nom: string;
-        prix: number;
-      };
-      remise: number;
-    }[];
-    remiseGlobale?: number;
-    createdAt: string;
-    status: boolean;
-    date: string;
-}
-
-interface Client {
-    _id: string;
-    nom: string;
-    adresse: string;
-    telephone: string
-}
 
 interface Product {
     _id: string;
     nom: string;
     prix: number;
     stock: number;
+    categorie: string;
 }
-interface Service { // Add Service interface
+
+interface Service {
     _id: string;
     nom: string;
     prix: number;
 }
+// Interface pour le client, si elle n'existe pas déjà
+interface Client {
+    _id: string;
+    nom: string;
+    adresse: string;
+    telephone: string;
+}
 
-// --- Helper Functions ---
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
-};
-//Calculate subtotal for products.
-const calculateProductsSubtotal = (orderItems?: Order['produits']) => {
-    if (!orderItems) return 0;
+interface OrderItem {
+    type: 'product' | 'service';
+    item: Product | Service;
+    quantity: number;
+    discount: number;
+    customPrice: number;
+}
 
-    return orderItems.reduce((total, item) => {
-        const price = item.produit.prix;
-        const quantity = item.quantite;
-        const discount = item.remise || 0;
-        return total + (price * quantity - discount);
-    }, 0);
-};
-
-//Calculate subtotal for service
-const calculateServicesSubtotal = (orderServices?: Order['services']) => {
-    if (!orderServices) return 0;
-
-    return orderServices.reduce((total, item) => {
-        const price = item.service.prix;
-        const discount = item.remise || 0;
-        return total + (price - discount);
-    }, 0);
-};
-//Calculate Total
-const calculateOrderTotal = (productsSubtotal: number, servicesSubtotal: number, globalDiscount: number = 0): string => {
-    const total = productsSubtotal + servicesSubtotal - globalDiscount;
-    return total.toFixed(2);
-};
-
+interface Order {
+    _id: string;
+    client: Client; // Utiliser l'interface Client
+    produits: {
+        produit: Product;
+        quantite: number;
+        remise: number;
+        customPrice: number;
+    }[];
+    services: {
+        service: Service;
+        remise: number;
+        customPrice: number;
+    }[];
+    remiseGlobale?: number;
+    date: string;
+    status: boolean;
+}
 
 // --- Component ---
-const EditOrderPage: React.FC = () => {
-    const navigate = useNavigate();
-    const { orderId } = useParams<{ orderId: string }>();
-    const [order, setOrder] = useState<Order | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [clients, setClients] = useState<Client[]>([]);
-    const [products, setProducts] = useState<Product[]>([]);
-    const [services, setServices] = useState<Service[]>([]); // Add services state
 
+const OrderEditPage = () => {
     const { toast } = useToast();
+    const navigate = useNavigate();
+    const { id } = useParams(); // Get order ID from URL
 
+    // --- State ---
+    const [order, setOrder] = useState<Order | null>(null);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [services, setServices] = useState<Service[]>([]);
+    const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+    const [globalDiscount, setGlobalDiscount] = useState<number>(0);
+    const [loading, setLoading] = useState(true);
     const [productSearchTerm, setProductSearchTerm] = useState('');
-    const [serviceSearchTerm, setServiceSearchTerm] = useState(''); // Add service search term
+    const [serviceSearchTerm, setServiceSearchTerm] = useState('');
+    const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
+    const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [selectedService, setSelectedService] = useState<Service | null>(null);
+    const [dialogQuantity, setDialogQuantity] = useState<number>(1);
+    const [dialogDiscount, setDialogDiscount] = useState<number>(0);
+    const [dialogCustomPrice, setDialogCustomPrice] = useState<number>(0);
 
+    // --- Data Fetching ---
 
-    const [newProduct, setNewProduct] = useState<{ productId: string; quantity: string; discount: string; prix: string }>({
-        productId: '',
-        quantity: '',
-        discount: '',
-        prix: ''
-    });
+    // Fetch order details
+    const fetchOrder = useCallback(async () => {
+        if (!id) return;
+        setLoading(true);
+        try {
+            const response = await axiosInstance.get<Order>(`api/commandes/${id}`);
+            setOrder(response.data);
 
-      // --- State for New Service ---
-    const [newService, setNewService] = useState<{ serviceId: string; discount: string; prix: string }>({
-        serviceId: '',
-        discount: '',
-        prix: ''
-    });
+            // Transform order data to unified OrderItem format
+            const transformedOrderItems: OrderItem[] = [];
+            response.data.produits.forEach((p) => {
+                transformedOrderItems.push({
+                    type: 'product',
+                    item: p.produit,
+                    quantity: p.quantite,
+                    discount: p.remise,
+                    customPrice: p.customPrice,
+                });
+            });
+            response.data.services.forEach((s) => {
+                transformedOrderItems.push({
+                    type: 'service',
+                    item: s.service,
+                    quantity: 1,
+                    discount: s.remise,
+                    customPrice: s.customPrice,
+                });
+            });
+            setOrderItems(transformedOrderItems);
+            setGlobalDiscount(response.data.remiseGlobale || 0);
+        } catch (error) {
+            console.error('Error fetching order:', error);
+            toast({ title: 'Erreur', description: 'Impossible de charger la commande.', variant: 'destructive' });
+        } finally {
+            setLoading(false);
+        }
+    }, [id, toast]);
 
+    // Fetch all products and services
+    const fetchProductsAndServices = useCallback(async () => {
+        try {
+            const [productsResponse, servicesResponse] = await Promise.all([
+                axiosInstance.get<Product[]>('api/produits'),
+                axiosInstance.get<Service[]>('api/services'),
+            ]);
+            setProducts(productsResponse.data);
+            setServices(servicesResponse.data);
+        } catch (error) {
+            console.error('Error fetching products and services:', error);
+            toast({
+                title: 'Erreur',
+                description: 'Impossible de charger les produits et services.',
+                variant: 'destructive',
+            });
+        }
+    }, [toast]);
 
-    // --- Fetch Order, Clients, Products, and Services ---
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const [orderResponse, clientsResponse, productsResponse, servicesResponse] = await Promise.all([
-                    axiosInstance.get<Order>(`/api/commandes/${orderId}`),
-                    axiosInstance.get<Client[]>(`api/clients`),
-                    axiosInstance.get<Product[]>(`api/produits`),
-                    axiosInstance.get<Service[]>(`api/services`), // Fetch services
-                ]);
-                setOrder(orderResponse.data);
-                setClients(clientsResponse.data);
-                setProducts(productsResponse.data);
-                setServices(servicesResponse.data); // Set services
-            } catch (error) {
-                console.error("Error fetching data:", error);
-                toast({ title: "Error", description: "Failed to fetch data.", variant: "destructive" });
-            } finally {
-                setLoading(false);
-            }
-        };
+        fetchOrder();
+        fetchProductsAndServices();
+    }, [fetchOrder, fetchProductsAndServices]);
 
-        if (orderId) {
-            fetchData();
-        }
-    }, [orderId, toast]);
+    // --- Helper Functions ---
 
-    // --- Input Change Handlers ---
-  const handleInputChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-    itemId?: string,
-    field?: string,
-    itemType?: 'produit' | 'service'
-  ) => {
-    const { name, value } = event.target;
-
-    if (itemId && field && itemType) {
-      setOrder((prevOrder) => {
-        if (!prevOrder) return prevOrder;
-
-        const items = itemType === 'produit' ? prevOrder.produits : prevOrder.services;
-        const itemIndex = items.findIndex(p => p._id === itemId);
-        if (itemIndex === -1) return prevOrder;
-
-        const updatedItems = [...items];
-
-        if (field === 'quantite') {
-            const numValue = parseInt(value, 10);
-            const selectedProduct = products.find(p => p._id === (items[itemIndex] as any).produit._id); //Needs check because service haven't quantity
-
-              if (selectedProduct && !isNaN(numValue) && numValue > selectedProduct.stock) {
-                toast({ variant: 'destructive', title: 'Error', description: `Quantity cannot exceed available stock (${selectedProduct.stock}).`});
-                return prevOrder;
-            }
-            (updatedItems[itemIndex] as any).quantite = parseInt(value, 10); // Update quantity
-        } else if (field === 'remise') {
-            if (itemType === 'produit') {
-                (updatedItems[itemIndex] as any).remise = parseFloat(value) || 0;
-            } else {
-                (updatedItems[itemIndex] as any).remise = parseFloat(value) || 0;
-            }
-        }
-
-        return {
-          ...prevOrder,
-          [itemType === 'produit' ? 'produits' : 'services']: updatedItems,
-        };
-      });
-    } else {
-      setOrder((prevOrder) => {
-        if (!prevOrder) return prevOrder;
-        if (name === 'remiseGlobale') {
-          return { ...prevOrder, [name]: parseFloat(value) || 0 };
+    const addItemToOrder = useCallback(() => {
+        const item = selectedProduct || selectedService;
+        if (!item) return;
+    
+        const type = selectedProduct ? 'product' : 'service';
+        const existingItemIndex = orderItems.findIndex(
+            (orderItem) => orderItem.item._id === item._id && orderItem.type === type
+        );
+    
+        if (existingItemIndex > -1) {
+            // Item exists, update it
+            const updatedOrderItems = [...orderItems];
+            const existingItem = updatedOrderItems[existingItemIndex];
+    
+            updatedOrderItems[existingItemIndex] = {
+                ...existingItem,
+                quantity: type === 'product' ? (existingItem.quantity || 0) + dialogQuantity : 1, // Increment quantity if product
+                discount: dialogDiscount,
+                customPrice: dialogCustomPrice,
+            };
+            setOrderItems(updatedOrderItems);
         } else {
-          return {
-            ...prevOrder,
-            client: {
-              ...prevOrder.client,
-              [name]: value,
-            },
-          };
+            // New item
+            const newOrderItem: OrderItem = {
+                type,
+                item,
+                quantity: type === 'product' ? dialogQuantity : 1,
+                discount: dialogDiscount,
+                customPrice: dialogCustomPrice,
+            };
+            setOrderItems([...orderItems, newOrderItem]);
         }
-      });
-    }
-  };
+    
+        // Reset dialog states
+        setIsProductDialogOpen(false);
+        setIsServiceDialogOpen(false);
+        setSelectedProduct(null);
+        setSelectedService(null);
+        setDialogQuantity(1);
+        setDialogDiscount(0);
+        setDialogCustomPrice(0);
+    
+    }, [orderItems, selectedProduct, selectedService, dialogQuantity, dialogDiscount, dialogCustomPrice]); // Dependencies for useCallback
 
-    const handleClientChange = (value: string) => {
-        const selectedClient = clients.find((c) => c._id === value);
-        setOrder((prevOrder) => ({
-            ...prevOrder,
-            client: selectedClient
-                ? {
-                    _id: selectedClient._id,
-                    nom: selectedClient.nom,
-                    adresse: selectedClient.adresse || '',
-                    telephone: selectedClient.telephone || ''
-                }
-                : undefined,
-        }));
+    const handleRemoveItem = (itemId: string, type: 'product' | 'service') => {
+        setOrderItems(orderItems.filter((item) => !(item.item._id === itemId && item.type === type)));
     };
 
-   const handleNewProductChange = (field: 'productId' | 'quantity' | 'discount' | 'prix', value: string) => {
-    if (field === 'quantity' && newProduct.productId) {
-        const selectedProduct = products.find((p) => p._id === newProduct.productId);
-        const numValue = parseInt(value, 10);
-        if (selectedProduct && !isNaN(numValue) && numValue > selectedProduct.stock) {
-            toast({ variant: "destructive",  title: "Error", description: `Quantity cannot exceed available stock (${selectedProduct.stock}).`, });
-            return;
-        }
-    }
-
-    if (field === 'productId') {
-        const selectedProduct = products.find((product) => product._id === value);
-        if (selectedProduct) {
-            setNewProduct((prev) => ({
-                ...prev,
-                productId: value,
-                prix: selectedProduct.prix.toString(),
-            }));
-        }
-        return;
-    }
-
-    setNewProduct((prev) => ({
-        ...prev,
-        [field]: value,
-    }));
+    const handleUpdateItem = (itemId: string, type: 'product' | 'service', updates: Partial<OrderItem>) => {
+        setOrderItems(
+            orderItems.map((item) =>
+                item.item._id === itemId && item.type === type ? { ...item, ...updates } : item
+            )
+        );
     };
 
-    const handleNewServiceChange = (field: 'serviceId' | 'discount' | 'prix', value: string) => {
-        if (field === 'serviceId') {
-            const selectedService = services.find((service) => service._id === value);
-            if (selectedService) {
-                setNewService((prev) => ({
-                    ...prev,
-                    serviceId: value,
-                    prix: selectedService.prix.toString(), // Keep price as string for input
-                }));
+    const calculateSubtotal = () => {
+        return orderItems.reduce((total, orderItem) => {
+            const price = orderItem.customPrice;
+            const discountMultiplier = 1 - orderItem.discount / 100;
+            const quantity = orderItem.quantity || 1;
+            return total + price * quantity * discountMultiplier;
+        }, 0);
+    };
+
+    const calculateGrandTotal = () => {
+        const subtotal = calculateSubtotal();
+        return subtotal * (1 - globalDiscount / 100);
+    };
+
+    // --- Event Handlers ---
+
+    const handleOpenProductDialog = (product: Product) => {
+        setSelectedProduct(product);
+        setDialogQuantity(1);
+        setDialogDiscount(0);
+        setDialogCustomPrice(product.prix);
+        setIsProductDialogOpen(true);
+    };
+
+    const handleOpenServiceDialog = (service: Service) => {
+        setSelectedService(service);
+        setDialogDiscount(0);
+        setDialogCustomPrice(service.prix);
+        setIsServiceDialogOpen(true);
+    };
+
+        const handleUpdateOrder = async () => {
+           if (!order) return;
+
+            if(globalDiscount < 0){
+                 toast({ title: 'Erreur', description: 'La remise ne peut pas être négative.', variant: 'destructive' });
+                return;
             }
-            return;
-        }
 
-        setNewService((prev) => ({
-            ...prev,
-            [field]: value,
-        }));
+            const updatedOrderData = {
+                client: order.client._id, // Keep the same client
+                produits: orderItems
+                    .filter((item) => item.type === 'product')
+                    .map((item) => ({
+                        produit: item.item._id,
+                        quantite: item.quantity,
+                        remise: item.discount,
+                        customPrice: item.customPrice,
+                    })),
+                services: orderItems
+                    .filter((item) => item.type === 'service')
+                    .map((item) => ({
+                        service: item.item._id,
+                        remise: item.discount,
+                        customPrice: item.customPrice,
+                    })),
+                remiseGlobale: globalDiscount,
+            };
+
+
+        try {
+            const response = await axiosInstance.put(`api/commandes/${order._id}`, updatedOrderData);
+            if (response.status === 200) {
+                toast({ title: 'Succès', description: 'Commande mise à jour avec succès.' });
+                navigate(`/orders`); // back to the order list
+            } else {
+                toast({ title: 'Erreur', description: 'Erreur lors de la mise à jour de la commande.', variant: 'destructive' });
+            }
+        } catch (error) {
+            console.error('Error updating order:', error);
+            toast({
+                title: 'Erreur',
+                description: "Une erreur s'est produite lors de la mise à jour de la commande.",
+                variant: 'destructive',
+            });
+        }
     };
 
 
-    const handleDeleteProduct = (productId: string) => {
-        setOrder((prevOrder) => {
-            if (!prevOrder) return prevOrder;
-            const updatedProduits = prevOrder.produits.filter((p) => p._id !== productId);
-            return { ...prevOrder, produits: updatedProduits };
-        });
-    };
+    // --- Filtered Products and Services (for the selection lists) ---
 
-     // Handle service deletion
-    const handleDeleteService = (serviceId: string) => {
-        setOrder((prevOrder) => {
-            if (!prevOrder?.services) return prevOrder;
-            const updatedServices = prevOrder.services.filter((s) => s._id !== serviceId);
-            return { ...prevOrder, services: updatedServices };
-        });
-    };
+    const filteredProducts = products.filter((product) =>
+        product.nom.toLowerCase().includes(productSearchTerm.toLowerCase())
+    );
 
-    const filteredProducts = useMemo(() => {
-        return products.filter((product) =>
-            product.nom.toLowerCase().includes(productSearchTerm.toLowerCase())
-        );
-    }, [products, productSearchTerm]);
+    const filteredServices = services.filter((service) =>
+        service.nom.toLowerCase().includes(serviceSearchTerm.toLowerCase())
+    );
 
-     const filteredServices = useMemo(() => { // Filter services
-        return services.filter((service) =>
-            service.nom.toLowerCase().includes(serviceSearchTerm.toLowerCase())
-        );
-    }, [services, serviceSearchTerm]);
-
-
-   const handleAddProduct = () => {
-        if (!newProduct.productId || !newProduct.quantity) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Product and quantity are required.' });
-            return;
-        }
-
-        const selectedProduct = products.find((p) => p._id === newProduct.productId);
-        if (!selectedProduct) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Selected product not found.' });
-            return;
-        }
-         const quantity = parseInt(newProduct.quantity, 10);
-        if (isNaN(quantity) || quantity > selectedProduct.stock) {
-          toast({ variant: "destructive", title: "Error",  description: `Quantity cannot exceed available stock (${selectedProduct.stock}).` });
-          return;
-        }
-
-
-        if (order?.produits.some((item) => item.produit._id === newProduct.productId)) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Product already in order.' });
-            return;
-        }
-
-        const productToAdd = {
-            _id: uuidv4(),
-            produit: {
-                _id: selectedProduct._id,
-                nom: selectedProduct.nom,
-                prix: selectedProduct.prix,
-                stock: selectedProduct.stock
-            },
-            quantite: parseInt(newProduct.quantity, 10),
-            remise: parseFloat(newProduct.discount) || 0,
-        };
-
-        setOrder((prevOrder) => ({
-            ...prevOrder,
-            produits: [...(prevOrder?.produits || []), productToAdd],
-        }));
-
-        setNewProduct({ productId: '', quantity: '', discount: '', prix: '' });
-        setProductSearchTerm("");
-    };
-    const handleAddService = () => {
-        if (!newService.serviceId) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Service is required.' });
-            return;
-        }
-
-        const selectedService = services.find((s) => s._id === newService.serviceId);
-        if (!selectedService) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Selected service not found.' });
-            return;
-        }
-
-        if (order?.services?.some((item) => item.service._id === newService.serviceId)) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Service already in order.' });
-            return;
-        }
-
-        const serviceToAdd = {
-            _id: uuidv4(),
-            service: {
-                _id: selectedService._id,
-                nom: selectedService.nom,
-                prix: selectedService.prix,
-            },
-            remise: parseFloat(newService.discount) || 0,
-        };
-
-        setOrder((prevOrder) => ({
-            ...prevOrder,
-            services: [...(prevOrder?.services || []), serviceToAdd],
-        }));
-
-        setNewService({ serviceId: '', discount: '', prix: '' });
-        setServiceSearchTerm("");
-    };
-
-
-
-    const handleSubmit = async (event: React.FormEvent) => {
-      event.preventDefault();
-      if (!order) return;
-
-      const produits = order.produits.map(p => ({
-          produit: p.produit._id,
-          quantite: p.quantite,
-          remise: p.remise,
-          prix: p.produit.prix
-      }));
-
-      const services = order.services.map(s => ({
-          service: s.service._id,
-          remise: s.remise,
-          prix: s.service.prix
-      }));
-
-      try {
-          const response = await axiosInstance.put(`/api/commandes/${orderId}`, {
-              clientId: order.client._id,
-              produits: produits,
-              services: services, // Send services
-              remiseGlobale: order.remiseGlobale,
-          });
-
-          toast({ title: 'Success', description: 'Order updated successfully.' });
-          navigate('/Commande');
-
-      } catch (error) {
-          console.error("Error updating order:", error);
-          toast({ title: "Error", description: "Failed to update order.", variant: "destructive" });
-      }
-  };
-
-
+    // --- JSX Rendering ---
 
     if (loading) {
-        return <p>Loading...</p>;
+        return <div>Chargement...</div>;
     }
 
     if (!order) {
-        return <p>Order not found.</p>;
+        return <div>Commande introuvable.</div>;
     }
 
     return (
         <>
             <Header />
-           <div className='container mx-auto py-8'>
-                <Card>
-                   <CardHeader>
-                        <CardTitle>Edit Order</CardTitle>
-                        <CardDescription>
-                          Edit Client, Products, and Services.
-                        </CardDescription>
-                    </CardHeader>
-                    <form onSubmit={handleSubmit}>
-                        <CardContent className="space-y-6">
-                            {/* --- Client and Products Sections --- */}
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="container py-8">
+                <h1 className="text-3xl font-semibold mb-6">Modifier la Commande #{order._id}</h1>
+                  <h2 className="text-2xl  mb-6">Client: {order.client.nom}</h2>
 
-                             {/* --- Client Section --- */}
-                                <Card className="p-4 border rounded-lg">
-                                    <CardHeader>
-                                        <CardTitle><User className="mr-2 h-5 w-5 text-blue-500" /> Client Information</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="grid grid-cols-1  gap-4">
-                                            <div>
-                                                <Label htmlFor="client">Client:</Label>
-                                                <Select onValueChange={handleClientChange} value={order.client._id}>
-                                                    <SelectTrigger className="w-full">
-                                                        <SelectValue placeholder="Select a client" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {clients.map((client) => (
-                                                            <SelectItem key={client._id} value={client._id}>
-                                                                {client.nom}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="adresse">Address:</Label>
-                                                <Input
-                                                    id="adresse"
-                                                    name="adresse"
-                                                    value={order.client.adresse}
-                                                    onChange={handleInputChange}
-                                                    className="w-full"
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="telephone">Phone:</Label>
-                                                <Input
-                                                    id="telephone"
-                                                    name="telephone"
-                                                    value={order.client.telephone}
-                                                    onChange={handleInputChange}
-                                                    className="w-full"
-                                                />
-                                            </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Product Selection (Keep Add Product button) */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Ajouter des Produits</CardTitle>
+                            <Input
+                                placeholder="Rechercher un produit..."
+                                value={productSearchTerm}
+                                onChange={(e) => setProductSearchTerm(e.target.value)}
+                                className="mt-2"
+                            />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                {filteredProducts.length > 0 ? (
+                                    filteredProducts.map((product) => (
+                                        <div
+                                            key={product._id}
+                                            className="p-2 border rounded-md cursor-pointer hover:bg-gray-100 flex items-center justify-between"
+                                            onClick={() => handleOpenProductDialog(product)}
+                                        >
+                                            <span>{product.nom} ({product.stock} en stock)</span>
+                                            <span className="text-sm text-gray-500">{formatCurrency(product.prix)}</span>
                                         </div>
-                                    </CardContent>
-                                </Card>
+                                    ))
+                                ) : (
+                                    <p>Aucun produit trouvé.</p>
+                                )}
+                            </div>
+                            <Button variant="outline" asChild className="mt-2 w-full">
+                                <Link to="/products/new">
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Ajouter Produit
+                                </Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
 
-                                {/* --- Products Section --- */}
-                                 <Card className="p-4 border rounded-lg">
-                                    <CardHeader>
-                                        <CardTitle><ShoppingBag className="mr-2 h-5 w-5 text-green-500" /> Products</CardTitle>
-                                    </CardHeader>
-                                  <CardContent>
-                                        <div className="grid grid-cols-1  gap-6">
-                                            <div>
-                                                 <h3 className="text-lg font-semibold mb-3">Existing Products</h3>
-                                                <Table>
-                                                    <TableHeader>
-                                                        <TableRow>
-                                                            <TableHead>Product</TableHead>
-                                                            <TableHead className="text-right">Price</TableHead>
-                                                            <TableHead className="text-right">Quantity</TableHead>
-                                                            <TableHead className="text-right">Discount (%)</TableHead>
-                                                            <TableHead className="text-right">Actions</TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                         {order.produits.map((item) => (
-                                                            <TableRow key={item._id}>
-                                                                <TableCell>{item.produit.nom}</TableCell>
-                                                                <TableCell className="text-right">{formatCurrency(item.produit.prix)}</TableCell>
-                                                                <TableCell className="text-right">
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={item.quantite}
-                                                                        onChange={(e) => handleInputChange(e, item._id, "quantite", 'produit')}
-                                                                        className="w-24 text-right"
-                                                                    />
-                                                                </TableCell>
-                                                                 <TableCell className="text-right">
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={item.remise}
-                                                                       onChange={(e) => handleInputChange(e, item._id, "remise", 'produit')}
-                                                                        className="w-24 text-right"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell className="text-right">
-                                                                      <Button variant="ghost" size="icon"  onClick={() => handleDeleteProduct(item._id)}>
-                                                                        <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700 transition" />
-                                                                    </Button>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </div>
-
-                                            <div>
-                                                 <h3 className="text-lg font-semibold mb-3">Add New Product</h3>
-                                                  <div className="mb-4">
-                                                        <Input
-                                                        type="text"
-                                                        placeholder="Search products..."
-                                                        value={productSearchTerm}
-                                                        onChange={(e) => setProductSearchTerm(e.target.value)}
-                                                        className="w-full"
-                                                        />
-                                                    </div>
-                                                <div className="grid grid-cols-4 gap-4">
-                                                    <div>
-                                                         <Label htmlFor="new-product">Product:</Label>
-                                                        <Select
-                                                            onValueChange={(value) => handleNewProductChange('productId', value)}
-                                                            value={newProduct.productId}>
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue placeholder="Select a product" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {filteredProducts.map(product => (
-                                                                    <SelectItem key={product._id} value={product._id}>
-                                                                        {product.nom}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                     <div>
-                                                        <Label htmlFor='new-price'> Price:</Label>
-                                                        <Input id='new-price'  value={products.find((p) => p._id === newProduct.productId)?.prix || ''}  disabled  className="w-full text-right" />
-                                                     </div>
-                                                    <div>
-                                                         <Label htmlFor="new-quantity">Quantity:</Label>
-                                                        <Input
-                                                            id="new-quantity"
-                                                            type="number"
-                                                            value={newProduct.quantity}
-                                                            onChange={(e) => handleNewProductChange('quantity', e.target.value)}
-                                                            className="w-full"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                         <Label htmlFor="new-discount">Discount (%):</Label>
-                                                        <Input
-                                                            id="new-discount"
-                                                            type="number"
-                                                            value={newProduct.discount}
-                                                            onChange={(e) => handleNewProductChange('discount', e.target.value)}
-                                                            className="w-full"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                 <Button type="button"  variant="outline"  onClick={handleAddProduct}  className="mt-4 w-full" >
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                                                </Button>
-                                            </div>
+                    {/* Service Selection (Keep Add Service button) */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Ajouter des Services</CardTitle>
+                            <Input
+                                placeholder="Rechercher un service..."
+                                value={serviceSearchTerm}
+                                onChange={(e) => setServiceSearchTerm(e.target.value)}
+                                className="mt-2"
+                            />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                {filteredServices.length > 0 ? (
+                                    filteredServices.map((service) => (
+                                        <div
+                                            key={service._id}
+                                            className="p-2 border rounded-md cursor-pointer hover:bg-gray-100 flex items-center justify-between"
+                                            onClick={() => handleOpenServiceDialog(service)}
+                                        >
+                                            <span>{service.nom}</span>
+                                           <span className="text-sm text-gray-500">{formatCurrency(service.prix)}</span>
                                         </div>
-                                     {/* Global Discount inside product card */}
-                                        <div className="mt-6">
-                                            <Label htmlFor="remiseGlobale">Global Discount (%):</Label>
-                                            <Input
-                                                type="number"
-                                                id="remiseGlobale"
-                                                name="remiseGlobale"
-                                                value={order.remiseGlobale || 0}
-                                                onChange={handleInputChange}
-                                                className="w-full"
-                                            />
-                                        </div>
+                                    ))
+                                ) : (
+                                    <p>Aucun service trouvé.</p>
+                                )}
+                            </div>
+                            <Button variant="outline" asChild className="mt-2 w-full">
+                                <Link to="/services/new">
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Ajouter Service
+                                </Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
 
-                                </CardContent>
-                            </Card>
-                          </div>
-
-                        {/* Services Card */}
-                        <Card className="p-4 border rounded-lg mt-6"> {/* Add mt-6 for spacing */}
-                            <CardHeader>
-                                <CardTitle><Box className="mr-2 h-5 w-5 text-green-500" /> Services</CardTitle> {/* Use Box icon */}
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">  {/* Use grid layout */}
-                                    <div>
-                                        <h3 className="text-lg font-semibold mb-3">Existing Services</h3>
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Service</TableHead>
-                                                    <TableHead className="text-right">Price</TableHead>
-                                                    <TableHead className="text-right">Discount (%)</TableHead>
-                                                    <TableHead className="text-right">Actions</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {order.services?.map((item) => (
-                                                <TableRow key={item._id}>
-                                                    <TableCell>{item.service.nom}</TableCell>
-                                                    <TableCell className="text-right">{formatCurrency(item.service.prix)}</TableCell>
-                                                     <TableCell className="text-right">
+                {/* Order Items Table */}
+                {orderItems.length > 0 && (
+                    <Card className="mt-6">
+                        <CardHeader><CardTitle>Articles de la Commande</CardTitle></CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead>Nom</TableHead>
+                                            <TableHead className="text-right">Quantité</TableHead>
+                                            <TableHead className="text-right">Prix Unitaire</TableHead>
+                                            <TableHead className="text-right">Remise (%)</TableHead>
+                                            <TableHead className="text-right">Total</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {orderItems.map((item) => (
+                                            <TableRow key={`${item.type}-${item.item._id}`}>
+                                                <TableCell>{item.type === 'product' ? 'Produit' : 'Service'}</TableCell>
+                                                <TableCell>{item.item.nom}</TableCell>
+                                                <TableCell className="text-right">
+                                                    {item.type === 'product' && (
                                                         <Input
                                                             type="number"
-                                                            value={item.remise}
-                                                            onChange={(e) => handleInputChange(e, item._id, "remise", 'service')}
-                                                            className="w-24 text-right"
+                                                            min="1"
+                                                            value={item.quantity}
+                                                            onChange={(e) =>
+                                                                handleUpdateItem(item.item._id, item.type, {
+                                                                    quantity: parseInt(e.target.value, 10),
+                                                                })
+                                                            }
+                                                            className="w-20 text-right"
                                                         />
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Button  variant="ghost" size="icon"  onClick={() => handleDeleteService(item._id)}  >
-                                                        <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700 transition" />
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                            </TableBody>
-                                        </Table>
-                                      </div>
-
-                                      <div>
-                                         <h3 className="text-lg font-semibold mb-3">Add New Service</h3>
-                                           <div className="mb-4">
-                                              <Input
-                                                type="text"
-                                                placeholder="Search services..."
-                                                value={serviceSearchTerm}
-                                                onChange={(e) => setServiceSearchTerm(e.target.value)}
-                                                className="w-full"
-                                                />
-                                           </div>
-                                            <div className="grid grid-cols-3 gap-4">
-                                                <div>
-                                                    <Label htmlFor="new-service">Service:</Label>
-                                                        <Select onValueChange={(value) => handleNewServiceChange('serviceId', value)}  value={newService.serviceId}>
-                                                        <SelectTrigger className="w-full">
-                                                            <SelectValue placeholder="Select a service" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {filteredServices.map(service => (
-                                                                <SelectItem key={service._id} value={service._id}>
-                                                                    {service.nom}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor='new-service-price'> Price:</Label>
-                                                    <Input id='new-service-price'  value={services.find((s) => s._id === newService.serviceId)?.prix || ''}  disabled  className="w-full text-right" />
-                                                  </div>
-                                                <div>
-                                                    <Label htmlFor="new-service-discount">Discount (%):</Label>
+                                                    )}
+                                                    {item.type === 'service' && <span>-</span>}
+                                                </TableCell>
+                                                <TableCell className="text-right">
                                                     <Input
-                                                        id="new-service-discount"
                                                         type="number"
-                                                        value={newService.discount}
-                                                        onChange={(e) => handleNewServiceChange('discount', e.target.value)}
-                                                        className="w-full"
+                                                        min="0"
+                                                        value={item.customPrice}
+                                                        onChange={(e) =>
+                                                            handleUpdateItem(item.item._id, item.type, {
+                                                                customPrice: parseFloat(e.target.value),
+                                                            })
+                                                        }
+                                                        className="w-24 text-right"
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={item.discount}
+                                                        onChange={(e) =>
+                                                            handleUpdateItem(item.item._id, item.type, {
+                                                                discount: parseInt(e.target.value, 10),
+                                                            })
+                                                        }
+                                                        className="w-20 text-right"
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                   {formatCurrency(item.customPrice * (item.quantity || 1) * (1 - item.discount / 100))}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        variant="destructive"
+                                                        size="icon"
+                                                        onClick={() => handleRemoveItem(item.item._id, item.type)}
+                                                    >
+                                                        <XCircle className="h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Order Summary */}
+                <Card className="mt-6">
+                    <CardHeader><CardTitle>Récapitulatif de la Commande</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="space-y-2">
+                            <div className="flex justify-between">
+                                <span>Sous-total:</span>
+                                 <span>{formatCurrency(calculateSubtotal())}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <Label htmlFor="global-discount">Remise Globale (%):</Label>
+                                <Input
+                                    id="global-discount"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={globalDiscount}
+                                    onChange={(e) => setGlobalDiscount(Number(e.target.value))}
+                                    className="w-20 text-right"
+                                />
+                            </div>
+                            <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+                                <span>Total:</span>
+                                 <span>{formatCurrency(calculateGrandTotal())}</span>
+                            </div>
+                            <Button className="mt-4 w-full" onClick={handleUpdateOrder}>
+                                Mettre à Jour la Commande
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Product Selection Dialog */}
+                <AlertDialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Ajouter un Produit</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {selectedProduct && (
+                                    <>
+                                        <p>Produit: {selectedProduct.nom}</p>
+                                         <p>Prix initial: {formatCurrency(selectedProduct.prix)}</p>
+                                        <div className="grid grid-cols-2 gap-4 mt-4">
+                                            <div className="grid grid-cols-3 items-center gap-4">
+                                                <Label htmlFor="dialog-quantity" className="text-right">
+                                                    Quantité
+                                                </Label>
+                                                <Input
+                                                    id="dialog-quantity"
+                                                    type="number"
+                                                    min="1"
+                                                    value={dialogQuantity}
+                                                    onChange={(e) => setDialogQuantity(Math.max(1, parseInt(e.target.value, 10)))}
+                                                    className="col-span-2 w-20"
+                                                />
+                                            </div>
+                                            <div>
+                                                <div className="grid grid-cols-3 items-center gap-4">
+                                                    <Label htmlFor="dialog-discount" className="text-right">
+                                                        Remise (%)
+                                                    </Label>
+                                                    <Input
+                                                        id="dialog-discount"
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={dialogDiscount}
+                                                        onChange={(e) => setDialogDiscount(Math.max(0, parseInt(e.target.value, 10)))}
+                                                        className="col-span-2 w-20"
                                                     />
                                                 </div>
                                             </div>
-                                           <Button  type="button" variant="outline" onClick={handleAddService}  className="mt-4 w-full"  >
-                                                <PlusCircle className="mr-2 h-4 w-4" /> Add Service
-                                            </Button>
+                                            <div>
+                                                <div className="grid grid-cols-3 items-center gap-4">
+                                                    <Label htmlFor="dialog-custom-price" className="text-right">
+                                                        Prix
+                                                    </Label>
+                                                    <Input
+                                                        id="dialog-custom-price"
+                                                        type="number"
+                                                        min="0"
+                                                        value={dialogCustomPrice}
+                                                        onChange={(e) => setDialogCustomPrice(Math.max(0, parseFloat(e.target.value)))}
+                                                        className="col-span-2 w-32"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                            </CardContent>
-                        </Card>
-                           {/* Total Due */}
-                            <div className="mt-6 p-4 border rounded-md bg-gray-50">
-                                <h2 className="text-lg font-semibold">Total Due:</h2>
-                                 <p className="text-xl font-bold text-blue-600">
-                                  {formatCurrency(parseFloat(calculateOrderTotal(calculateProductsSubtotal(order.produits), calculateServicesSubtotal(order.services), order.remiseGlobale)))}
-                                </p>
-                            </div>
-                        </CardContent>
+                                    </>
+                                )}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction onClick={addItemToOrder}>
+                                Ajouter
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
 
-                        <CardFooter className="justify-end">
-                             <Button type="button" variant="outline" className="mr-2" onClick={() => navigate(-1)}>
-                                Retour
-                            </Button>
-                            <Button type="submit">Update Order</Button>
-                        </CardFooter>
-                    </form>
-                </Card>
+                {/* Service Selection Dialog */}
+                <AlertDialog open={isServiceDialogOpen} onOpenChange={setIsServiceDialogOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Ajouter un Service</AlertDialogTitle>
+                        <AlertDialogDescription>
+                                {selectedService && (
+                                    <>
+                                        <p>Service: {selectedService.nom}</p>
+                                        <p>Prix initial: {formatCurrency(selectedService.prix)}</p>
+                                        <div className="grid gap-4 mt-4">
+                                            <div>
+                                                <div className="grid grid-cols-3 items-center gap-4">
+                                                    <Label htmlFor="dialog-discount-s" className="text-right">
+                                                        Remise (%)
+                                                    </Label>
+                                                    <Input
+                                                        id="dialog-discount-s"
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={dialogDiscount}
+                                                        onChange={(e) => setDialogDiscount(Math.max(0, parseInt(e.target.value, 10)))}
+                                                        className="col-span-2 w-20"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="grid grid-cols-3 items-center gap-4">
+                                                    <Label htmlFor="dialog-custom-price-s" className="text-right">
+                                                        Prix
+                                                    </Label>
+                                                    <Input
+                                                        id="dialog-custom-price-s"
+                                                        type="number"
+                                                        min="0"
+                                                        value={dialogCustomPrice}
+                                                        onChange={(e) => setDialogCustomPrice(Math.max(0, parseFloat(e.target.value)))}
+                                                        className="col-span-2 w-32"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction onClick={addItemToOrder}>Ajouter</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </>
     );
 };
 
-export default EditOrderPage;
+export default OrderEditPage;
