@@ -369,7 +369,7 @@ const OrderNewPage = () => {
                                 )}
                             </div>
                             <Button variant="outline" asChild className="mt-2 w-full">
-                                <Link to="/services/new">
+                                <Link to="/service">
                                     <PlusCircle className="mr-2 h-4 w-4" /> Ajouter Service
                                 </Link>
                             </Button>
