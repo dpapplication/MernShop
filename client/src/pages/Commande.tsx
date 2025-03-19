@@ -29,6 +29,7 @@ interface Order {
             prix: number;
             stock: number;
         };
+        prix:number;
         quantite: number;
         remise: number;
     }[];
@@ -60,7 +61,7 @@ const formatCurrency = (value: number) => {
 const calculateProductsSubtotal = (orderItems: Order['produits'] | undefined): number => {
     if (!orderItems) return 0;
     return orderItems.reduce((total, item) => {
-        return total + (item.produit.prix * item.quantite - (item.remise || 0));
+        return total + (item.prix * item.quantite - (item.remise || 0));
     }, 0);
 };
 //Calculate subtotal for service
@@ -163,9 +164,9 @@ const OrderListPage = () => {
         const productItems = order.produits?.map((item) => [
               item.produit.nom,
               item.quantite,
-              item.produit.prix,
+              item.prix,
               `${item.remise}%`,
-              (item.produit.prix * item.quantite - (item.remise || 0))
+              (item.prix * item.quantite - (item.remise || 0))
          ]) || [];
 
         const productColumns = ["Produit", "Quantité", "Prix Unitaire", "Remise", "Total"];
