@@ -12,6 +12,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable'
 import axiosInstance from '@/utils/axiosInstance';
 import { Link } from 'react-router-dom';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
 
 // --- Interfaces ---
 interface Order {
@@ -29,33 +31,42 @@ interface Order {
             prix: number;
             stock: number;
         };
-        prix:number;
+        prix: number;
         quantite: number;
         remise: number;
     }[];
-    services: { // Added services
-      service: {
-        _id: string;
-        nom: string;
-        prix: number;
-      };
-      prix:number,
-      remise: number;
+    services: {
+        service: {
+            _id: string;
+            nom: string;
+            prix: number;
+        };
+        prix: number,
+        remise: number;
     }[];
     remiseGlobale?: number;
     date: string;
     status: boolean;
 }
 
-interface Payment { // Keep Payment interface
-  _id: string;
-  montant: number;
-  methode: string;
+interface Payment {
+    _id: string;
+    montant: number;
+    methode: string;
 }
 
 // --- Helper Functions ---
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
+};
+
+// Updated formatDate function
+const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`; // DD/MM/YYYY format
 };
 
 const calculateProductsSubtotal = (orderItems: Order['produits'] | undefined): number => {
@@ -64,7 +75,7 @@ const calculateProductsSubtotal = (orderItems: Order['produits'] | undefined): n
         return total + (item.prix * item.quantite - (item.remise || 0));
     }, 0);
 };
-//Calculate subtotal for service
+
 const calculateServicesSubtotal = (orderServices: Order['services'] | undefined): number => {
     if (!orderServices) return 0;
     return orderServices.reduce((total, item) => {
@@ -73,23 +84,23 @@ const calculateServicesSubtotal = (orderServices: Order['services'] | undefined)
 };
 
 const calculateTotalPayments = async (orderId: string): Promise<number> => {
-  try {
-    const response = await axiosInstance.get<Payment[]>(`/api/paiements/commande/${orderId}`);
-    const payments = response.data;
+    try {
+        const response = await axiosInstance.get<Payment[]>(`/api/paiements/commande/${orderId}`);
+        const payments = response.data;
 
-    if (!payments || payments.length === 0) {
-      return 0;
+        if (!payments || payments.length === 0) {
+            return 0;
+        }
+
+        return payments.reduce((total, payment) => total + payment.montant, 0);
+    } catch (error) {
+        console.error("Error fetching payments:", error);
+        return 0;
     }
-
-    return payments.reduce((total, payment) => total + payment.montant, 0);
-  } catch (error) {
-    console.error("Error fetching payments:", error);
-    return 0;
-  }
 };
 
-const calculateTotalDue = (productsSubtotal:number, servicesSubtotal:number, totalPayments: number, globalDiscount: number = 0): string => {
-   const total = productsSubtotal + servicesSubtotal;
+const calculateTotalDue = (productsSubtotal: number, servicesSubtotal: number, totalPayments: number, globalDiscount: number = 0): string => {
+    const total = productsSubtotal + servicesSubtotal;
     const discountedSubtotal = total - globalDiscount;
     return (discountedSubtotal - totalPayments).toFixed(2);
 };
@@ -103,9 +114,9 @@ const OrderListPage = () => {
     const navigate = useNavigate();
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
-    // State to hold payments for the selected order
+    const [itemsPerPage, setItemsPerPage] = useState(10);
     const [selectedOrderPayments, setSelectedOrderPayments] = useState<Payment[]>([]);
+    const [searchDate, setSearchDate] = useState('');
 
 
     const fetchOrders = useCallback(async () => {
@@ -127,7 +138,7 @@ const OrderListPage = () => {
 
 
 
-   const handlePdf = (order: Order) => {
+    const handlePdf = (order: Order) => {
         if (!order) return;
         const doc = new jsPDF();
 
@@ -148,7 +159,7 @@ const OrderListPage = () => {
         doc.text(`Order Number: ORD-${order._id.substring(order._id.length - 6)}`, 14, 75);
         doc.text(`Date: ${order.date}`, 14, 82);
 
-         if (order.client) {
+        if (order.client) {
             doc.setFontSize(14);
             doc.text("Client Information:", 14, 95);
             doc.setFontSize(12);
@@ -162,12 +173,12 @@ const OrderListPage = () => {
 
         // Products Table
         const productItems = order.produits?.map((item) => [
-              item.produit.nom,
-              item.quantite,
-              item.prix,
-              `${item.remise}%`,
-              (item.prix * item.quantite - (item.remise || 0))
-         ]) || [];
+            item.produit.nom,
+            item.quantite,
+            item.prix,
+            `${item.remise}%`,
+            (item.prix * item.quantite - (item.remise || 0))
+        ]) || [];
 
         const productColumns = ["Produit", "Quantité", "Prix Unitaire", "Remise", "Total"];
 
@@ -175,7 +186,7 @@ const OrderListPage = () => {
             head: [productColumns],
             body: productItems,
             startY: 130,
-            headStyles: {fillColor: [41, 128, 185]},
+            headStyles: { fillColor: [41, 128, 185] },
             columnStyles: {
                 1: { halign: 'right' },
                 2: { halign: 'right' },
@@ -187,7 +198,7 @@ const OrderListPage = () => {
         });
 
         // Services Table (if services exist)
-        if(order.services && order.services.length > 0) {
+        if (order.services && order.services.length > 0) {
             const serviceItems = order.services.map(item => [
                 item.service.nom,
                 item.prix,
@@ -201,7 +212,7 @@ const OrderListPage = () => {
                 head: [serviceColumns],
                 body: serviceItems,
                 startY: startY,
-                headStyles: {fillColor: [41, 128, 185]},
+                headStyles: { fillColor: [41, 128, 185] },
                 columnStyles: {
                     1: { halign: 'right' },
                     2: { halign: 'right' },
@@ -213,38 +224,38 @@ const OrderListPage = () => {
         }
 
 
-         // --- Get Payments ---
+        // --- Get Payments ---
         axiosInstance.get(`/api/paiements/commande/${order._id}`)
             .then(paymentsResponse => {
                 const payments = paymentsResponse.data;
-                 // --- Payment details ---
-                if (payments && payments.length > 0){
-                let startY = (doc as any).lastAutoTable.finalY + 15; // Cast doc to any to access lastAutoTable
-                doc.setFontSize(14);
-                doc.text("Payments:", 14, startY);
-                    startY+=7;
+                // --- Payment details ---
+                if (payments && payments.length > 0) {
+                    let startY = (doc as any).lastAutoTable.finalY + 15; // Cast doc to any to access lastAutoTable
+                    doc.setFontSize(14);
+                    doc.text("Payments:", 14, startY);
+                    startY += 7;
                     const paymentsData = payments.map((payment) => [
-                    payment.methode,
-                formatCurrency(payment.montant), // format currency
-                ]);
+                        payment.methode,
+                        formatCurrency(payment.montant), // format currency
+                    ]);
 
-                autoTable(doc, {
-                    head: [['Payment Type', 'Amount']],
-                    body: paymentsData,
-                    startY: startY,
-                    headStyles: {fillColor: [41, 128, 185]},
-                    columnStyles: { 1: { halign: 'right' } },
-                    margin: { left: 14 },
-                });
-            }
-            const productsSubtotal = calculateProductsSubtotal(order.produits);
-            const servicesSubtotal = calculateServicesSubtotal(order.services);
-            const totalPayments = calculateTotalPayments(order._id);
-            const remiseGlobale = order.remiseGlobale || 0;
+                    autoTable(doc, {
+                        head: [['Payment Type', 'Amount']],
+                        body: paymentsData,
+                        startY: startY,
+                        headStyles: { fillColor: [41, 128, 185] },
+                        columnStyles: { 1: { halign: 'right' } },
+                        margin: { left: 14 },
+                    });
+                }
+                const productsSubtotal = calculateProductsSubtotal(order.produits);
+                const servicesSubtotal = calculateServicesSubtotal(order.services);
+                const totalPayments = calculateTotalPayments(order._id);
+                const remiseGlobale = order.remiseGlobale || 0;
 
-            let startY = (doc as any).lastAutoTable.finalY + 15;
+                let startY = (doc as any).lastAutoTable.finalY + 15;
                 doc.setFontSize(12);
-                 doc.text(`Products Subtotal: ${formatCurrency(productsSubtotal)}`, 196, startY, { align: 'right' });
+                doc.text(`Products Subtotal: ${formatCurrency(productsSubtotal)}`, 196, startY, { align: 'right' });
                 startY += 7;
                 doc.text(`Services Subtotal: ${formatCurrency(servicesSubtotal)}`, 196, startY, { align: 'right' });
                 startY += 7;
@@ -258,7 +269,7 @@ const OrderListPage = () => {
                     startY += 7;
                     doc.setFontSize(14);
                     doc.setFont('helvetica', 'bold');
-                   const totalDue = calculateTotalDue(productsSubtotal, servicesSubtotal,total, order.remiseGlobale);
+                    const totalDue = calculateTotalDue(productsSubtotal, servicesSubtotal, total, order.remiseGlobale);
                     doc.text(`Remaining Balance: ${totalDue}`, 196, startY, { align: 'right' });
                     doc.setFont('helvetica', 'normal');
                     doc.setFontSize(10);
@@ -275,13 +286,17 @@ const OrderListPage = () => {
             });
     };
 
+   const filteredOrders = useMemo(() => {
+   
+    return orders.filter(order => {
+        const clientNameMatch = order.client.nom.toLowerCase().includes(searchTerm.toLowerCase());
+        // Use the formatted date for searching, and compare with the input date string.
+        const formattedOrderDate = formatDate(order.date);
+        const dateMatch = !searchDate || formattedOrderDate.includes(formatDate(searchDate));
+        return clientNameMatch && dateMatch;
+    });
+}, [orders, searchTerm, searchDate]);
 
-    const filteredOrders = useMemo(() => {
-        return orders.filter(order =>
-            order.client.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            order.client.telephone.includes(searchTerm)
-        );
-    }, [orders, searchTerm]);
 
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -291,23 +306,26 @@ const OrderListPage = () => {
         return filteredOrders.slice(startIndex, endIndex);
     }, [filteredOrders, startIndex, endIndex]);
 
-    const handlePageChange = (newPage: number) => {
-        setCurrentPage(newPage);
+
+    const handleItemsPerPageChange = (value: string) => {  // Changed to accept string value
+        const newItemsPerPage = parseInt(value, 10);
+        setItemsPerPage(newItemsPerPage);
+        setCurrentPage(1);
     };
 
-  const [totals, setTotals] = useState<{ [orderId: string]: { productsSubtotal: number; servicesSubtotal: number; totalPayments: number; remaining: string; } }>({});
+    const [totals, setTotals] = useState<{ [orderId: string]: { productsSubtotal: number; servicesSubtotal: number; totalPayments: number; remaining: string; } }>({});
 
     useEffect(() => {
         const calculateTotals = async () => {
-        const newTotals: { [orderId: string]: { productsSubtotal: number; servicesSubtotal: number; totalPayments: number; remaining: string; } } = {};
-        for (const order of orders) {
-            const productsSubtotal = calculateProductsSubtotal(order.produits);
-            const servicesSubtotal = calculateServicesSubtotal(order.services); // Calculate service subtotal
-            const totalPayments = await calculateTotalPayments(order._id);
-            const remaining = calculateTotalDue(productsSubtotal,servicesSubtotal, totalPayments, order.remiseGlobale || 0);
-            newTotals[order._id] = { productsSubtotal, servicesSubtotal, totalPayments, remaining }; // Include servicesSubtotal
-        }
-        setTotals(newTotals);
+            const newTotals: { [orderId: string]: { productsSubtotal: number; servicesSubtotal: number; totalPayments: number; remaining: string; } } = {};
+            for (const order of orders) {
+                const productsSubtotal = calculateProductsSubtotal(order.produits);
+                const servicesSubtotal = calculateServicesSubtotal(order.services);
+                const totalPayments = await calculateTotalPayments(order._id);
+                const remaining = calculateTotalDue(productsSubtotal, servicesSubtotal, totalPayments, order.remiseGlobale || 0);
+                newTotals[order._id] = { productsSubtotal, servicesSubtotal, totalPayments, remaining };
+            }
+            setTotals(newTotals);
         };
         calculateTotals();
 
@@ -343,7 +361,7 @@ const OrderListPage = () => {
             toast({ title: "Error", description: "Failed to delete order.", variant: "destructive" });
         }
     }, [toast]);
-     // Function to fetch and set payments for the selected order
+
     const fetchAndSetPayments = useCallback(async (orderId: string) => {
         try {
             const response = await axiosInstance.get<Payment[]>(`/api/paiements/commande/${orderId}`);
@@ -355,11 +373,11 @@ const OrderListPage = () => {
                 description: "Failed to fetch payments for the selected order.",
                 variant: "destructive",
             });
-            setSelectedOrderPayments([]); // Reset to empty array on error
+            setSelectedOrderPayments([]);
         }
     }, [toast]);
 
-      // Call fetchAndSetPayments when the dialog opens and an order is selected
+
     useEffect(() => {
         if (selectedOrder) {
             fetchAndSetPayments(selectedOrder._id);
@@ -372,13 +390,36 @@ const OrderListPage = () => {
             <Header />
             <div className="container py-8">
                 <h1 className="text-3xl font-semibold mb-6">Liste des Commandes</h1>
-                <div className="mb-4">
+                <div className="mb-4 flex flex-col md:flex-row gap-4 items-center">
                     <Input
-                        placeholder="Rechercher par nom de client, téléphone..."
+                        placeholder="Rechercher par nom de client..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                        className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 w-full md:w-1/3"
                     />
+                    <Input
+                         type="date"
+                        placeholder="Rechercher par date..."
+                        value={searchDate}
+                        onChange={(e) => setSearchDate(e.target.value)}
+                        className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 w-full md:w-1/3"
+                    />
+
+                    {/* Items Per Page Selection - Using Shadcn UI */}
+                    <div className="w-full md:w-auto">
+                        <Select onValueChange={handleItemsPerPageChange} value={String(itemsPerPage)}>
+                            <SelectTrigger className="w-full md:w-[180px]">
+                                <SelectValue placeholder="Commandes par page" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="5">5</SelectItem>
+                                <SelectItem value="10">10</SelectItem>
+                                <SelectItem value="20">20</SelectItem>
+                                <SelectItem value="50">50</SelectItem>
+                                <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
                 {loading ? (
                     <p>Loading orders...</p>
@@ -391,7 +432,8 @@ const OrderListPage = () => {
                                         <TableRow>
                                             <TableHead className="whitespace-nowrap">N° Commande</TableHead>
                                             <TableHead>Client</TableHead>
-                                             <TableHead className="text-right">Total Produits</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead className="text-right">Total Produits</TableHead>
                                             <TableHead className="text-right">Total Services</TableHead>
                                             <TableHead className="text-right">Paiements</TableHead>
                                             <TableHead className="text-right">Reste à payer</TableHead>
@@ -401,7 +443,7 @@ const OrderListPage = () => {
                                     </TableHeader>
                                     <TableBody>
                                         {currentOrders.length > 0 ? (
-                                             currentOrders.map((order) => {
+                                            currentOrders.map((order) => {
                                                 const { productsSubtotal = 0, servicesSubtotal = 0, totalPayments = 0, remaining = '0.00' } = totals[order._id] || {};
                                                 return (
                                                     <TableRow key={order._id}>
@@ -409,11 +451,12 @@ const OrderListPage = () => {
                                                             ORD-{order._id.substring(order._id.length - 6)}
                                                         </TableCell>
                                                         <TableCell>{order.client.nom}</TableCell>
+                                                        <TableCell>{formatDate(order.date)}</TableCell>
                                                         <TableCell className="text-right">{formatCurrency(productsSubtotal)}</TableCell>
-                                                        <TableCell className="text-right">{formatCurrency(servicesSubtotal)}</TableCell> {/* Display services subtotal */}
+                                                        <TableCell className="text-right">{formatCurrency(servicesSubtotal)}</TableCell>
                                                         <TableCell className="text-right">{formatCurrency(totalPayments)}</TableCell>
                                                         <TableCell className={`text-right ${remaining === '0.00' ? 'text-green-500' : 'text-red-500'}`}>
-                                                           {formatCurrency(parseFloat(remaining))}
+                                                            {formatCurrency(parseFloat(remaining))}
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             {order.status ? (
@@ -434,7 +477,7 @@ const OrderListPage = () => {
                                                                         <Eye className="h-4 w-4" />
                                                                     </Button>
                                                                 </DialogTrigger>
-                                                                 <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+                                                                <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
                                                                     <DialogHeader>
                                                                         <DialogTitle>Détails de la Commande</DialogTitle>
                                                                         <DialogDescription>
@@ -446,7 +489,7 @@ const OrderListPage = () => {
                                                                     </DialogHeader>
                                                                     {selectedOrder && (
                                                                         <div className="space-y-4">
-                                                                             <Card className="border rounded-md p-4">
+                                                                            <Card className="border rounded-md p-4">
                                                                                 <CardHeader>
                                                                                     <CardTitle className='text-lg'> Information Client</CardTitle>
                                                                                 </CardHeader>
@@ -457,7 +500,7 @@ const OrderListPage = () => {
                                                                                 </CardContent>
                                                                             </Card>
 
-                                                                              {/* Products Display */}
+                                                                            {/* Products Display */}
                                                                             <Card>
                                                                                 <CardHeader>
                                                                                     <CardTitle className="text-lg">Articles de la commande (Produits)</CardTitle>
@@ -490,9 +533,9 @@ const OrderListPage = () => {
                                                                                         </Table>
                                                                                     </div>
                                                                                 </CardContent>
-                                                                              </Card>
+                                                                            </Card>
 
-                                                                              {/* Services Display */}
+                                                                            {/* Services Display */}
                                                                             <Card>
                                                                                 <CardHeader>
                                                                                     <CardTitle className="text-lg">Services de la commande</CardTitle>
@@ -523,7 +566,7 @@ const OrderListPage = () => {
                                                                                         </Table>
                                                                                     </div>
                                                                                 </CardContent>
-                                                                              </Card>
+                                                                            </Card>
 
                                                                             <Card>
                                                                                 <CardHeader>
@@ -536,7 +579,7 @@ const OrderListPage = () => {
                                                                                                 <TableRow>
                                                                                                     <TableHead>Méthode</TableHead>
                                                                                                     <TableHead className="text-right">Montant</TableHead>
-                                                                                                     <TableHead>Caisse</TableHead>
+                                                                                                    <TableHead>Caisse</TableHead>
                                                                                                 </TableRow>
                                                                                             </TableHeader>
                                                                                             <TableBody>
@@ -560,27 +603,27 @@ const OrderListPage = () => {
                                                                             </Card>
 
 
-                                                                             <Card>
+                                                                            <Card>
                                                                                 <CardContent>
                                                                                     Summary
                                                                                     <div className="mt-4 p-4  rounded-md ">
                                                                                         <div className="space-y-2">
                                                                                             <div className="flex justify-between">
-                                                                                              <span>Sous-Total Produits:</span>
+                                                                                                <span>Sous-Total Produits:</span>
                                                                                                 <span className="font-medium">{formatCurrency(calculateProductsSubtotal(selectedOrder.produits))}</span>
                                                                                             </div>
                                                                                             <div className="flex justify-between">
-                                                                                              <span>Sous-Total Services:</span>
-                                                                                              <span className="font-medium">{formatCurrency(calculateServicesSubtotal(selectedOrder.services))}</span>
+                                                                                                <span>Sous-Total Services:</span>
+                                                                                                <span className="font-medium">{formatCurrency(calculateServicesSubtotal(selectedOrder.services))}</span>
                                                                                             </div>
                                                                                             <div className="flex justify-between">
                                                                                                 <span>Remise Globale:</span>
                                                                                                 <span className="font-medium">{selectedOrder.remiseGlobale || 0}%</span>
                                                                                             </div>
-                                                                                             <div className="border-t pt-2 mt-2 flex justify-between">
+                                                                                            <div className="border-t pt-2 mt-2 flex justify-between">
                                                                                                 <span>Reste à payer:</span>
                                                                                                 <span className={`font-bold ${parseFloat(remaining) <= 0.001 ? 'text-green-600' : 'text-red-500'}`}>
-                                                                                                      {remaining}
+                                                                                                    {remaining}
                                                                                                 </span>
                                                                                             </div>
                                                                                         </div>
@@ -611,71 +654,44 @@ const OrderListPage = () => {
                                                                 <CreditCard className="h-4 w-4" />
                                                             </Button>
 
-                                                            {order.status ? (
-                                                                <></>
-                                                            ) : (
-                                                                <Button variant="outline" size="icon" title="Marquer comme payée" onClick={() => updateOrderStatus(order._id)}  >
-                                                                    <CheckCircle className="h-4 w-4" />
-                                                                </Button>
-                                                            )}
+                                                         
 
                                                             <Button variant="outline" size="icon" title="Imprimer la facture" onClick={() => handlePdf(order)}>
                                                                 <Printer className="h-4 w-4" />
                                                             </Button>
 
-                                                            <Dialog>
-                                                                <DialogTrigger asChild>
-                                                                    <Button variant="destructive" size="icon" title="Supprimer la commande">
-                                                                        <Trash2 className='h-4 w-4' />
-                                                                    </Button>
-                                                                </DialogTrigger>
-                                                                <DialogContent>
-                                                                    <DialogHeader>
-                                                                        <DialogTitle>Êtes-vous sûr(e) ?</DialogTitle>
-                                                                        <DialogDescription>
-                                                                            Voulez-vous vraiment supprimer cette commande ?  Cette action est irréversible.
-                                                                        </DialogDescription>
-                                                                    </DialogHeader>
-                                                                    <DialogFooter>
-                                                                        <DialogClose asChild>
-                                                                            <Button variant="secondary">Cancel</Button>
-                                                                        </DialogClose>
-                                                                        <Button variant="destructive" onClick={() => deleteOrder(order._id)}>
-                                                                            Delete
-                                                                        </Button>
-                                                                    </DialogFooter>
-                                                                </DialogContent>
-                                                            </Dialog>
+                                                           
                                                         </TableCell>
                                                     </TableRow>
                                                 );
                                             })
                                         ) : (
                                             <TableRow>
-                                                <TableCell colSpan={8} className="text-center">Aucune commande trouvée.</TableCell>
+                                                <TableCell colSpan={9} className="text-center">Aucune commande trouvée.</TableCell>
                                             </TableRow>
                                         )}
                                     </TableBody>
                                 </Table>
                             </div>
-                            {filteredOrders.length > itemsPerPage && (
+                            {/* Pagination Controls */}
+                            {filteredOrders.length > 0 && (
                                 <div className="flex justify-center mt-4 space-x-2">
                                     <Button
                                         variant="outline"
                                         disabled={currentPage === 1}
-                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                     >
-                                        Previous
+                                        Précédent
                                     </Button>
                                     <span>
-                                        Page {currentPage} of {Math.ceil(filteredOrders.length / itemsPerPage)}
+                                        Page {currentPage} sur {Math.ceil(filteredOrders.length / itemsPerPage)}
                                     </span>
                                     <Button
                                         variant="outline"
                                         disabled={currentPage === Math.ceil(filteredOrders.length / itemsPerPage)}
-                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        onClick={() => setCurrentPage(prev => prev + 1)}
                                     >
-                                        Next
+                                        Suivant
                                     </Button>
                                 </div>
                             )}
