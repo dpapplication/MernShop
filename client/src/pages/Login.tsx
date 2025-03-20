@@ -1,6 +1,6 @@
 import React, { useState, FormEvent } from 'react';
 import {
-  Card, CardContent, CardHeader, CardTitle, CardFooter,
+  Card, CardContent, CardHeader, CardFooter,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,7 +47,7 @@ function LoginPage() {
     if (!password) {
       setPasswordError("Le mot de passe est requis.");
       hasError = true;
-    } 
+    }
 
     if (hasError) {
       return;
@@ -128,72 +128,87 @@ function LoginPage() {
   };
 
 
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="flex flex-col items-center w-full max-w-md">
-        <img
-          src='./logo.jpeg' // Use the imported image variable
-          alt="Your Company Logo"
-          className="mb-4 w-20 h-auto" // Adjust width as needed
-        />
-        <Card className="w-full">
-          <CardHeader className="text-center space-y-2">
-            {/* No CardTitle needed here, the logo is above */}
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="email">
-                  <User className='h-4 w-4 mr-2' />Nom d'utilisateur
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Entrez votre nom d'utilisateur"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  aria-label="Email Address"
-                  aria-describedby="email-error"
+    return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-100">
+            <div className="flex flex-col items-center w-full max-w-md">
+                <img
+                    src='./logo.jpeg'
+                    alt="Your Company Logo"
+                    className="mb-4 w-20 h-auto rounded-full"
+                    style={{ animation: 'pulse 2s ease-in-out infinite' }} // Changed animation here
                 />
-                {emailError && <p id="email-error" className="text-red-500 text-sm">{emailError}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">
-                  <KeyRound className='h-4 w-4 mr-2' />Mot de passe
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Entrez votre mot de passe"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  aria-label="Password"
-                  aria-describedby="password-error"
-                />
-                {passwordError && <p id="password-error" className="text-red-500 text-sm">{passwordError}</p>}
-              </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Lock className="mr-2 h-4 w-4 animate-spin" /> Connexion en cours...
-                  </>
-                ) : (
-                  <>
-                    <Lock className="mr-2 h-4 w-4 " /> Se connecter
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-          <CardFooter className='flex justify-center'>
-            <a href="/forgot-password" className="text-sm text-blue-500 hover:underline">
-              Mot de passe oublié ?
-            </a>
-          </CardFooter>
-        </Card>
-      </div>
-    </div>
-  );
+                <Card className="w-full">
+                    <CardHeader className="text-center space-y-2">
+                        {/* No CardTitle needed here, the logo is above */}
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="email">
+                                    <User className='h-4 w-4 mr-2' />Nom d'utilisateur
+                                </Label>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    placeholder="Entrez votre nom d'utilisateur"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    aria-label="Email Address"
+                                    aria-describedby="email-error"
+                                />
+                                {emailError && <p id="email-error" className="text-red-500 text-sm">{emailError}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="password">
+                                    <KeyRound className='h-4 w-4 mr-2' />Mot de passe
+                                </Label>
+                                <Input
+                                    id="password"
+                                    type="password"
+                                    placeholder="Entrez votre mot de passe"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    aria-label="Password"
+                                    aria-describedby="password-error"
+                                />
+                                {passwordError && <p id="password-error" className="text-red-500 text-sm">{passwordError}</p>}
+                            </div>
+                            <Button type="submit" className="w-full" disabled={isLoading}>
+                                {isLoading ? (
+                                    <>
+                                        <Lock className="mr-2 h-4 w-4 animate-spin" /> Connexion en cours...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Lock className="mr-2 h-4 w-4 " /> Se connecter
+                                    </>
+                                )}
+                            </Button>
+                        </form>
+                    </CardContent>
+                    <CardFooter className='flex justify-center'>
+                        <a href="/forgot-password" className="text-sm text-blue-500 hover:underline">
+                            Mot de passe oublié ?
+                        </a>
+                    </CardFooter>
+                </Card>
+            </div>
+            {/* Keyframes for the animation */}
+            <style>{`
+        @keyframes pulse {
+          0% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.1);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+      `}</style>
+        </div>
+    );
 }
 
 export default LoginPage;
