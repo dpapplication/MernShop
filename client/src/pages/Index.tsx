@@ -186,9 +186,9 @@ const OrderNewPage = () => {
     const calculateSubtotal = () => {
         return orderItems.reduce((total, orderItem) => {
             const price = orderItem.prix;
-            const discountMultiplier = 1 - orderItem.discount / 100;
+            const discountMultiplier =  orderItem.discount ;
             const quantity = orderItem.quantity || 1; // Default to 1 if undefined (for services)
-            return total + price * quantity * discountMultiplier;
+            return total + price * quantity - discountMultiplier;
         }, 0);
     };
 
@@ -445,7 +445,7 @@ const OrderNewPage = () => {
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    {(item.prix * (item.quantity || 1) * (1 - item.discount / 100)).toFixed(2)} €
+                                                    {(item.prix * (item.quantity || 1)  - item.discount ).toFixed(2)} €
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <Button

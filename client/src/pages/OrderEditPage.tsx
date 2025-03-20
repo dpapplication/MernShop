@@ -249,15 +249,15 @@ const OrderEditPage = () => {
     const calculateSubtotal = () => {
         return orderItems.reduce((total, orderItem) => {
             const price = orderItem.prix;
-            const discountMultiplier = 1 - orderItem.discount / 100;
+            const discountMultiplier = orderItem.discount;
             const quantity = orderItem.quantity || 1;
-            return total + price * quantity * discountMultiplier;
+            return total + price * quantity -discountMultiplier;
         }, 0);
     };
 
     const calculateGrandTotal = () => {
         const subtotal = calculateSubtotal();
-        return subtotal * (1 - globalDiscount / 100);
+        return subtotal - globalDiscount ;
     };
 
     // --- Event Handlers ---
@@ -515,7 +515,7 @@ console.log(updatedOrderData)
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                     {formatCurrency(item.prix * (item.quantity || 1) * (1 - item.discount / 100))}
+                                                     {formatCurrency(item.prix * (item.quantity || 1)  - item.discount )}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <Button
@@ -545,7 +545,7 @@ console.log(updatedOrderData)
                                  <span>{formatCurrency(calculateSubtotal())}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                                <Label htmlFor="global-discount">Remise Globale (%):</Label>
+                                <Label htmlFor="global-discount">Remise Globale:</Label>
                                 <Input
                                     id="global-discount"
                                     type="number"
