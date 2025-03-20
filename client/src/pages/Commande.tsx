@@ -522,7 +522,7 @@ const OrderListPage = () => {
                                                                                                     <TableRow key={item.produit._id}>
                                                                                                         <TableCell>{item.produit.nom}</TableCell>
                                                                                                         <TableCell className="text-right">{item.quantite}</TableCell>
-                                                                                                        <TableCell className="text-right">{formatCurrency(item.produit.prix)}</TableCell>
+                                                                                                        <TableCell className="text-right">{formatCurrency(item.prix)}</TableCell>
                                                                                                         <TableCell className="text-right">{item.remise}%</TableCell>
                                                                                                         <TableCell className="text-right">
                                                                                                             {formatCurrency(item.produit.prix * item.quantite * (1 - (item.remise) / 100))}
@@ -555,10 +555,10 @@ const OrderListPage = () => {
                                                                                                 {selectedOrder.services?.map((item) => (
                                                                                                     <TableRow key={item.service._id}>
                                                                                                         <TableCell>{item.service.nom}</TableCell>
-                                                                                                        <TableCell className="text-right">{formatCurrency(item.service.prix)}</TableCell>
+                                                                                                        <TableCell className="text-right">{formatCurrency(item.prix)}</TableCell>
                                                                                                         <TableCell className="text-right">{item.remise}%</TableCell>
                                                                                                         <TableCell className="text-right">
-                                                                                                            {formatCurrency(item.service.prix * (1 - (item.remise) / 100))}
+                                                                                                            {formatCurrency(item.prix -item.remise)}
                                                                                                         </TableCell>
                                                                                                     </TableRow>
                                                                                                 ))}

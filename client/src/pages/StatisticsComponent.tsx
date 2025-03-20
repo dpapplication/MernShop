@@ -198,13 +198,7 @@ const StatisticsComponent = () => {
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF']; // Example colors
 
-    if (loading) {
-        return <div>Loading statistics...</div>;
-    }
 
-    if (error) {
-        return <div>Error: {error}</div>;
-    }
 
     return (
         <>
