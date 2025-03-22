@@ -296,7 +296,7 @@ const OrderListPage = () => {
    const filteredOrders = useMemo(() => {
    
     return orders.filter(order => {
-        const clientNameMatch = order.client.nom.toLowerCase().includes(searchTerm.toLowerCase());
+        const clientNameMatch = order.client?.nom.toLowerCase().includes(searchTerm.toLowerCase());
         // Use the formatted date for searching, and compare with the input date string.
         const formattedOrderDate = formatDate(order.date);
         const dateMatch = !searchDate || formattedOrderDate.includes(formatDate(searchDate));
@@ -392,6 +392,13 @@ const OrderListPage = () => {
     }, [selectedOrder, fetchAndSetPayments]);
 
 
+    if (loading) {
+        return <div>Chargement...</div>;
+    }
+
+    if (!orders) {
+        return <div>Commande introuvable.</div>;
+    }
     return (
         <>
             <Header />
