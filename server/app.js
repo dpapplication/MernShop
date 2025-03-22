@@ -9,7 +9,7 @@ connectDB()
 // Middleware
 app.use(cors())
 app.use(express.json());
-const Caisse = require('../models/caisseModel');
+const Caisse = require('./src/models/caisseModel');
 const clientRoutes = require('./src/routes/clientRoutes');
 const produitRoutes = require('./src/routes/produitRoutes');
 const commandeRoutes = require('./src/routes/commandeRoutes');
@@ -33,7 +33,7 @@ function fermerCaisse() {
 }
 
 // Planifier l'ouverture de la caisse à 8h00 chaque jour
-cron.schedule('5 40 12 * * *', async () => {
+cron.schedule('5 46 12 * * *', async () => {
        try {
            const isCaisse=await Caisse.findOne().sort({dateOuverture:-1})
            if(!isCaisse){
@@ -53,7 +53,7 @@ cron.schedule('5 40 12 * * *', async () => {
 });
 
 // Planifier la fermeture de la caisse à 18h00 chaque jour
-cron.schedule('0 40 12 * * *', async() => {
+cron.schedule('0 46 12 * * *', async() => {
         try {
             const isCaisse=await Caisse.findOne({isOpen:true})
             if(!isCaisse){
