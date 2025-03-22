@@ -40,7 +40,7 @@ export default function ClientForm({ onClientAdded }: ClientFormProps) {
     e.preventDefault();
     
     // Validation
-    if (!formData.nom || !formData.adresse || !formData.telephone) {
+    if (!formData.nom || !formData.adresse) {
       toast({
         title: "Champs requis",
         description: "Veuillez remplir tous les champs du formulaire",

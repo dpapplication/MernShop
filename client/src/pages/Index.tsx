@@ -35,6 +35,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Link } from 'react-router-dom';
+import { Textarea } from "@/components/ui/textarea"
 
 // --- Interfaces ---
 
@@ -44,12 +45,14 @@ interface Product {
     prix: number;
     stock: number;
     categorie: string;
+    description?: string; // Added description
 }
 
 interface Service {
     _id: string;
     nom: string;
     prix: number;
+    description?: string; // Added description
 }
 
 interface Client {
@@ -84,6 +87,8 @@ const OrderNewPage = () => {
     const [loading, setLoading] = useState(true);  // General loading state
     const [productSearchTerm, setProductSearchTerm] = useState('');
     const [serviceSearchTerm, setServiceSearchTerm] = useState('');
+    const [orderDescription, setOrderDescription] = useState(''); // State for order description
+
 
     // Dialog states
     const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
@@ -125,48 +130,48 @@ const OrderNewPage = () => {
 
     // Add item to order (handles both products and services)
     const addItemToOrder = useCallback(() => {
-    const item = selectedProduct || selectedService;
-    if (!item) return;
+        const item = selectedProduct || selectedService;
+        if (!item) return;
 
-    const type = selectedProduct ? 'product' : 'service';
-    const existingItemIndex = orderItems.findIndex(
-        (orderItem) => orderItem.item._id === item._id && orderItem.type === type
-    );
+        const type = selectedProduct ? 'product' : 'service';
+        const existingItemIndex = orderItems.findIndex(
+            (orderItem) => orderItem.item._id === item._id && orderItem.type === type
+        );
 
-    if (existingItemIndex > -1) {
-        // Item exists, update it
-        const updatedOrderItems = [...orderItems];
-        const existingItem = updatedOrderItems[existingItemIndex];
+        if (existingItemIndex > -1) {
+            // Item exists, update it
+            const updatedOrderItems = [...orderItems];
+            const existingItem = updatedOrderItems[existingItemIndex];
 
-        updatedOrderItems[existingItemIndex] = {
-            ...existingItem,
-            quantity: type === 'product' ? (existingItem.quantity || 0) + dialogQuantity : 1, // Increment quantity if product
-            discount: dialogDiscount,
-            prix: dialogprix,
-        };
-        setOrderItems(updatedOrderItems);
-    } else {
-        // New item
-        const newOrderItem: OrderItem = {
-            type,
-            item,
-            quantity: type === 'product' ? dialogQuantity : 1,
-            discount: dialogDiscount,
-            prix: dialogprix,
-        };
-        setOrderItems([...orderItems, newOrderItem]);
-    }
+            updatedOrderItems[existingItemIndex] = {
+                ...existingItem,
+                quantity: type === 'product' ? (existingItem.quantity || 0) + dialogQuantity : 1, // Increment quantity if product
+                discount: dialogDiscount,
+                prix: dialogprix,
+            };
+            setOrderItems(updatedOrderItems);
+        } else {
+            // New item
+            const newOrderItem: OrderItem = {
+                type,
+                item,
+                quantity: type === 'product' ? dialogQuantity : 1,
+                discount: dialogDiscount,
+                prix: dialogprix,
+            };
+            setOrderItems([...orderItems, newOrderItem]);
+        }
 
-    // Reset dialog states
-    setIsProductDialogOpen(false);
-    setIsServiceDialogOpen(false);
-    setSelectedProduct(null);
-    setSelectedService(null);
-    setDialogQuantity(1);
-    setDialogDiscount(0);
-    setDialogprix(0);
+        // Reset dialog states
+        setIsProductDialogOpen(false);
+        setIsServiceDialogOpen(false);
+        setSelectedProduct(null);
+        setSelectedService(null);
+        setDialogQuantity(1);
+        setDialogDiscount(0);
+        setDialogprix(0);
 
-}, [orderItems, selectedProduct, selectedService, dialogQuantity, dialogDiscount, dialogprix]); // Dependencies for useCallback
+    }, [orderItems, selectedProduct, selectedService, dialogQuantity, dialogDiscount, dialogprix]); // Dependencies for useCallback
 
 
     const handleRemoveItem = (itemId: string, type: 'product' | 'service') => {
@@ -186,7 +191,7 @@ const OrderNewPage = () => {
     const calculateSubtotal = () => {
         return orderItems.reduce((total, orderItem) => {
             const price = orderItem.prix;
-            const discountMultiplier =  orderItem.discount ;
+            const discountMultiplier = orderItem.discount;
             const quantity = orderItem.quantity || 1; // Default to 1 if undefined (for services)
             return total + price * quantity - discountMultiplier;
         }, 0);
@@ -222,7 +227,7 @@ const OrderNewPage = () => {
             return;
         }
 
-        if(globalDiscount < 0){
+        if (globalDiscount < 0) {
             toast({ title: 'Erreur', description: 'La remise ne peut pas être négative.', variant: 'destructive' });
             return;
         }
@@ -247,11 +252,13 @@ const OrderNewPage = () => {
                     prix: item.prix,
                 })),
             remiseGlobale: globalDiscount,
+            description: orderDescription, // Add the description to the order data
+
         };
 
         try {
             const response = await axiosInstance.post('api/commandes', orderData);
-            
+
             if (response.status === 201) {
                 const newOrderId = response.data._id;
                 toast({ title: 'Succès', description: 'Commande créée avec succès.' });
@@ -325,7 +332,12 @@ const OrderNewPage = () => {
                                             className="p-2 border rounded-md cursor-pointer hover:bg-gray-100 flex items-center justify-between"
                                             onClick={() => handleOpenProductDialog(product)}
                                         >
-                                            <span>{product.nom} ({product.stock} en stock)</span>
+                                            <div>
+                                                <span>{product.nom} ({product.stock} en stock)</span>
+                                                {product.description && (
+                                                    <p className="text-sm text-gray-500">{product.description}</p>
+                                                )}
+                                            </div>
                                             <span className="text-sm text-gray-500">{product.prix.toFixed(2)} €</span>
                                         </div>
                                     ))
@@ -361,7 +373,12 @@ const OrderNewPage = () => {
                                             className="p-2 border rounded-md cursor-pointer hover:bg-gray-100 flex items-center justify-between"
                                             onClick={() => handleOpenServiceDialog(service)}
                                         >
-                                            <span>{service.nom}</span>
+                                            <div>
+                                                <span>{service.nom}</span>
+                                                {service.description && (
+                                                  <p className="text-sm text-gray-500">{service.description}</p>
+                                                )}
+                                            </div>
                                             <span className="text-sm text-gray-500">{service.prix.toFixed(2)} €</span>
                                         </div>
                                     ))
@@ -445,7 +462,7 @@ const OrderNewPage = () => {
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    {(item.prix * (item.quantity || 1)  - item.discount ).toFixed(2)} €
+                                                    {(item.prix * (item.quantity || 1) - item.discount).toFixed(2)} €
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <Button
@@ -470,6 +487,16 @@ const OrderNewPage = () => {
                     <CardHeader><CardTitle>Récapitulatif de la Commande</CardTitle></CardHeader>
                     <CardContent>
                         <div className="space-y-2">
+                             <div className="mb-4">
+                                <Label htmlFor="order-description">Description de la commande</Label>
+                                <Textarea
+                                    id="order-description"
+                                    placeholder="Ajouter une description pour cette commande (facultatif)..."
+                                    value={orderDescription}
+                                    onChange={(e) => setOrderDescription(e.target.value)}
+                                    className="mt-1"
+                                />
+                            </div>
                             <div className="flex justify-between">
                                 <span>Sous-total:</span>
                                 <span>{calculateSubtotal().toFixed(2)} €</span>
@@ -507,6 +534,9 @@ const OrderNewPage = () => {
                                     <>
                                         <p>Produit:  {selectedProduct.nom}</p>
                                         <p>Prix initial: {selectedProduct.prix.toFixed(2)} €</p>
+                                         {selectedProduct.description && (
+                                            <p>Description: {selectedProduct.description}</p>
+                                        )}
                                         <div className="grid grid-cols-2 gap-4 mt-4">
                                             <div className="grid grid-cols-3 items-center gap-4">
                                                 <Label htmlFor="dialog-quantity" className="text-right">
@@ -576,6 +606,9 @@ const OrderNewPage = () => {
                                     <>
                                         <p>Service: {selectedService.nom}</p>
                                         <p>Prix initial: {selectedService.prix.toFixed(2)} €</p>
+                                        {selectedService.description && (
+                                            <p>Description: {selectedService.description}</p>
+                                          )}
                                         <div className="grid gap-4 mt-4">
                                             <div>
                                                 <div className="grid grid-cols-3 items-center gap-4">

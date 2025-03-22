@@ -22,6 +22,7 @@ const commandeSchema = new mongoose.Schema({
 
     ],
     remiseGlobale:Number,
+    description:String,
     status:{
         type:Boolean,
         defaut:false 

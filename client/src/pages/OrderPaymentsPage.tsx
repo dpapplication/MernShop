@@ -155,7 +155,13 @@ const OrderPaymentsPage: React.FC = () => {
             setNewPayment(prev => ({ ...prev, [name]: value }));
         }
     };
-
+    const formatDate = (dateString: string): string => {
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`; // DD/MM/YYYY format
+    };
       const handleEditInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = event.target;
         if(name === 'montant'){
@@ -329,7 +335,7 @@ const OrderPaymentsPage: React.FC = () => {
     return (
         <div className="container mx-auto p-4">
             <Header />
-            <h1 className="text-2xl font-bold mb-4">Payments for Order: {orderId}</h1>
+            <h1 className="text-2xl font-bold mb-4">N° COmmande: {orderId}</h1>
             <Button variant="outline" className="mb-4" onClick={() => navigate(-1)}>
                 Retour
             </Button>
@@ -337,15 +343,15 @@ const OrderPaymentsPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Existing Payments</CardTitle>
+                        <CardTitle>Type de paiement</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="rounded-md border overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Method</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead>Méthode</TableHead>
+                                        <TableHead className="text-right">Montant</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -421,12 +427,12 @@ const OrderPaymentsPage: React.FC = () => {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Add New Payment</CardTitle>
+                        <CardTitle></CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <Label htmlFor="methode">Payment Method:</Label>
+                                <Label htmlFor="methode">Méthode:</Label>
                                 <Select onValueChange={(value) => handleInputChange({ target: { name: 'methode', value } } as any)} value={newPayment.methode}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select method" />
@@ -440,7 +446,7 @@ const OrderPaymentsPage: React.FC = () => {
                                 </Select>
                             </div>
                             <div>
-                                <Label htmlFor="montant">Amount:</Label>
+                                <Label htmlFor="montant">Montant:</Label>
                                 <Input
                                     type="number"
                                     id="montant"
@@ -453,23 +459,23 @@ const OrderPaymentsPage: React.FC = () => {
                             </div>
                         </div>
                         <Button type="button" variant="outline" onClick={handleAddPayment} className="mt-4">
-                            <PlusCircle className="mr-2 h-4 w-4" /> Add Payment
+                            <PlusCircle className="mr-2 h-4 w-4" /> Ajouter
                         </Button>
 
                          <div className="mt-6 p-4 border rounded-md bg-gray-50">
-                            <h2 className="text-lg font-semibold mb-2">Order Summary</h2>
+                            <h2 className="text-lg font-semibold mb-2">Vue globale</h2>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <p><span className="font-medium">Client:</span> {order.client.nom}</p>
-                                    <p><span className="font-medium">Date:</span> {order.date}</p>
+                                    <p><span className="font-medium">Date:</span> {formatDate(order.date)}</p>
                                     <p><span className='font-medium'>Status:</span> {order.status ? <span className='text-green-500'>Payée</span> : <span className='text-yellow-500'>En attente</span>}</p>
                                 </div>
                                  <div>
-                                    <p><span className="font-medium">Products Subtotal:</span> {formatCurrency(productsSubtotal)}</p>
-                                     <p><span className="font-medium">Services Subtotal:</span> {formatCurrency(servicesSubtotal)}</p>
-                                    <p><span className="font-medium">Total Payments:</span> {formatCurrency(totalPaymentsAmount)}</p>
-                                    <p><span className="font-medium">Global Discount:</span> {order.remiseGlobale || 0}%</p>
-                                    <p className='font-bold'><span className="font-medium">Rest to pay:</span> {formatCurrency(remainingBalance)}</p>
+                                    <p><span className="font-medium">Total produits:</span> {formatCurrency(productsSubtotal)}</p>
+                                     <p><span className="font-medium">Total service:</span> {formatCurrency(servicesSubtotal)}</p>
+                                    <p><span className="font-medium">Total:</span> {formatCurrency(totalPaymentsAmount)}</p>
+                                    <p><span className="font-medium">Remise globale:</span> {order.remiseGlobale || 0}%</p>
+                                    <p className='font-bold'><span className="font-medium">Reste à payer:</span> {formatCurrency(remainingBalance)}</p>
                                 </div>
                             </div>
                         </div>

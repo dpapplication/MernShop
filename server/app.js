@@ -33,7 +33,7 @@ function fermerCaisse() {
 }
 
 // Planifier l'ouverture de la caisse à 8h00 chaque jour
-cron.schedule('5 46 12 * * *', async () => {
+cron.schedule('5 52 13 * * *', async () => {
        try {
            const isCaisse=await Caisse.findOne().sort({dateOuverture:-1})
            if(!isCaisse){
@@ -53,7 +53,7 @@ cron.schedule('5 46 12 * * *', async () => {
 });
 
 // Planifier la fermeture de la caisse à 18h00 chaque jour
-cron.schedule('0 46 12 * * *', async() => {
+cron.schedule('0 52 13 * * *', async() => {
         try {
             const isCaisse=await Caisse.findOne({isOpen:true})
             if(!isCaisse){

@@ -7,7 +7,7 @@ const Caisse =require('../models/caisseModel');
 const caisseModel = require('../models/caisseModel');
 
 exports.createCommande = async (req, res) => {
-    const { clientId, produits ,remiseGlobale,services} = req.body;
+    const { clientId, produits ,remiseGlobale,services,description} = req.body;
     console.log(req.body)
     try {
         // Vérifier si le client existe
@@ -21,6 +21,7 @@ exports.createCommande = async (req, res) => {
             produits,
             services,
             remiseGlobale,
+            description
             
         });
 
@@ -76,7 +77,7 @@ exports.updateCommande = async (req, res) => {
             produit.stock=total+element.quantite
             produit.save()
         });
-        await Commande.findByIdAndUpdate(req.params.id,{ client:clientId, produits ,services, remiseGlobale},{new:true})
+        await Commande.findByIdAndUpdate(req.params.id,req.body,{new:true})
         produits.forEach(async(element) => {
             const produit = await Produit.findById(element.produit)
             const total =produit.stock

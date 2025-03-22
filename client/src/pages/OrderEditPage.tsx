@@ -29,6 +29,8 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Link } from 'react-router-dom';
+import { Textarea } from "@/components/ui/textarea" // Import Textarea
+
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
 };
@@ -79,7 +81,8 @@ interface Order {
     }[];
     remiseGlobale?: number;
     date: string;
-    status: boolean;
+    statut: string; // Changed boolean to string
+    description?: string; // Added description field
 }
 
 // --- Component ---
@@ -93,8 +96,8 @@ const OrderEditPage = () => {
     const [order, setOrder] = useState<Order | null>(null);
     const [products, setProducts] = useState<Product[]>([]);
     const [services, setServices] = useState<Service[]>([]);
-    const [clients, setClients] = useState<Client[]>([]); // State for clients
-    const [selectedClient, setSelectedClient] = useState<string>(''); // State for the selected client
+    const [clients, setClients] = useState<Client[]>([]);
+    const [selectedClient, setSelectedClient] = useState<string>('');
     const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
     const [globalDiscount, setGlobalDiscount] = useState<number>(0);
     const [loading, setLoading] = useState(true);
@@ -107,6 +110,8 @@ const OrderEditPage = () => {
     const [dialogQuantity, setDialogQuantity] = useState<number>(1);
     const [dialogDiscount, setDialogDiscount] = useState<number>(0);
     const [dialogprix, setDialogprix] = useState<number>(0);
+    const [orderDescription, setOrderDescription] = useState(''); // State for order description
+
 
     // --- Data Fetching ---
 
@@ -117,7 +122,8 @@ const OrderEditPage = () => {
             const response = await axiosInstance.get<Order>(`api/commandes/${id}`);
             const fetchedOrder = response.data;
             setOrder(fetchedOrder);
-            setSelectedClient(fetchedOrder.client._id); // Set selected client
+            setSelectedClient(fetchedOrder.client._id);
+            setOrderDescription(fetchedOrder.description || ''); // Initialize description
 
             // Transform to unified OrderItem format
             const transformedOrderItems: OrderItem[] = [];
@@ -167,7 +173,6 @@ const OrderEditPage = () => {
         }
     }, [toast]);
 
-    // Fetch Clients
      const fetchClients = useCallback(async () => {
         try {
             const response = await axiosInstance.get<Client[]>('api/clients');
@@ -187,7 +192,7 @@ const OrderEditPage = () => {
     useEffect(() => {
         fetchOrder();
         fetchProductsAndServices();
-        fetchClients(); // Fetch clients
+        fetchClients();
     }, [fetchOrder, fetchProductsAndServices, fetchClients]);
 
     // --- Helper Functions ---
@@ -201,7 +206,6 @@ const OrderEditPage = () => {
         );
 
         if (existingItemIndex > -1) {
-            // Item exists, update
             const updatedOrderItems = [...orderItems];
             const existingItem = updatedOrderItems[existingItemIndex];
 
@@ -213,7 +217,6 @@ const OrderEditPage = () => {
             };
             setOrderItems(updatedOrderItems);
         } else {
-            // New item
             const newOrderItem: OrderItem = {
                 type,
                 item,
@@ -284,10 +287,8 @@ const OrderEditPage = () => {
              toast({ title: 'Erreur', description: 'La remise ne peut pas être négative.', variant: 'destructive' });
             return;
         }
-
-        // Include the selected client in the updated data
         const updatedOrderData = {
-            clientId: selectedClient, // Use selectedClient
+            clientId: selectedClient,
             produits: orderItems
                 .filter((item) => item.type === 'product')
                 .map((item) => ({
@@ -304,11 +305,11 @@ const OrderEditPage = () => {
                     prix: item.prix,
                 })),
             remiseGlobale: globalDiscount,
+            description: orderDescription, // Include description in update
         };
-console.log(updatedOrderData)
+
         try {
             const response = await axiosInstance.put(`api/commandes/${id}`, updatedOrderData);
-            console.log(response.data)
             if (response.status === 200) {
                 toast({ title: 'Succès', description: 'Commande mise à jour avec succès.' });
                 navigate(`/Commande`);
@@ -540,6 +541,17 @@ console.log(updatedOrderData)
                     <CardHeader><CardTitle>Récapitulatif de la Commande</CardTitle></CardHeader>
                     <CardContent>
                         <div className="space-y-2">
+                             {/* Order Description */}
+                            <div className="mb-4">
+                                <Label htmlFor="order-description">Description de la commande</Label>
+                                <Textarea
+                                    id="order-description"
+                                    placeholder="Ajouter une description pour cette commande (facultatif)..."
+                                    value={orderDescription}
+                                    onChange={(e) => setOrderDescription(e.target.value)}
+                                    className="mt-1"
+                                />
+                            </div>
                             <div className="flex justify-between">
                                 <span>Sous-total:</span>
                                  <span>{formatCurrency(calculateSubtotal())}</span>
@@ -641,7 +653,7 @@ console.log(updatedOrderData)
                     <AlertDialogContent>
                         <AlertDialogHeader>
                             <AlertDialogTitle>Ajouter un Service</AlertDialogTitle>
-                        <AlertDialogDescription>
+                            <AlertDialogDescription>
                                 {selectedService && (
                                     <>
                                         <p>Service: {selectedService.nom}</p>

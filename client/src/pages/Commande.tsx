@@ -46,6 +46,7 @@ interface Order {
     }[];
     remiseGlobale?: number;
     date: string;
+    description: string;
     status: boolean;
 }
 
@@ -148,35 +149,34 @@ const OrderListPage = () => {
         doc.text("57 Avenue Alphonse Denis", 14, 27);
         doc.text("83400 Hyères", 14, 34);
         doc.text("Tel:0980496621", 14, 41);
+        doc.text("Siret: 948 058 383 00019", 14, 48);
+        doc.text("e-mail: yassmobile83@gmail.com", 14, 55);
         const logoImg = new Image()
         logoImg.src = './logo.jpeg'
         doc.addImage(logoImg, 'JPEG', 150, 15, 45, 45)
 
-        doc.setFontSize(20);
-        doc.text("Facture", 105, 60, { align: 'center' });
+        doc.setFontSize(25);
+        doc.text("Facture", 108, 60, { align: 'center' });
 
         doc.setFontSize(12);
-        doc.text(`Order Number: ORD-${order._id.substring(order._id.length - 6)}`, 14, 75);
-        doc.text(`Date: ${order.date}`, 14, 82);
+        doc.text(`N° Commande: ORD-${order._id.substring(order._id.length - 6)}`, 14, 75);
+        doc.text(`Date: ${formatDate(order.date)}`, 14, 82);
 
         if (order.client) {
             doc.setFontSize(14);
-            doc.text("Client Information:", 14, 95);
+            doc.text("Information du client:", 14, 95);
             doc.setFontSize(12);
-            doc.text(`Name: ${order.client.nom}`, 14, 102);
-            doc.text(`Address: ${order.client.adresse}`, 14, 109);
-            doc.text(`Phone: ${order.client.telephone}`, 14, 116);
+            doc.text(`Nom : ${order.client.nom}`, 14, 102);
+            doc.text(`Addresse: ${order.client.adresse}`, 14, 109);
+           
         }
-
-        doc.setLineWidth(0.5);
-        doc.line(14, 125, 196, 125);
 
         // Products Table
         const productItems = order.produits?.map((item) => [
             item.produit.nom,
             item.quantite,
             item.prix,
-            `${item.remise}%`,
+            `${item.remise}`,
             (item.prix * item.quantite - (item.remise || 0))
         ]) || [];
 
@@ -185,7 +185,7 @@ const OrderListPage = () => {
         autoTable(doc, {
             head: [productColumns],
             body: productItems,
-            startY: 130,
+            startY: 127,
             headStyles: { fillColor: [41, 128, 185] },
             columnStyles: {
                 1: { halign: 'right' },
@@ -202,7 +202,7 @@ const OrderListPage = () => {
             const serviceItems = order.services.map(item => [
                 item.service.nom,
                 item.prix,
-                `${item.remise}%`,
+                `${item.remise}`,
                 (item.service.prix - (item.remise || 0)) // Total for service
             ]);
             const serviceColumns = ["Service", "Prix", "Remise", "Total"];
@@ -222,7 +222,10 @@ const OrderListPage = () => {
                 theme: 'striped',
             });
         }
-
+       let startY = (doc as any).lastAutoTable.finalY + 7;
+        doc.setFontSize(11);
+        if(order.description)
+        doc.text(`description :MUI ${order.description}`, 14, startY);
 
         // --- Get Payments ---
         axiosInstance.get(`/api/paiements/commande/${order._id}`)
@@ -232,15 +235,15 @@ const OrderListPage = () => {
                 if (payments && payments.length > 0) {
                     let startY = (doc as any).lastAutoTable.finalY + 15; // Cast doc to any to access lastAutoTable
                     doc.setFontSize(14);
-                    doc.text("Payments:", 14, startY);
+                    doc.text("Paiement:", 14, startY);
                     startY += 7;
                     const paymentsData = payments.map((payment) => [
                         payment.methode,
-                        formatCurrency(payment.montant), // format currency
+                        payment.montant, // format currency
                     ]);
 
                     autoTable(doc, {
-                        head: [['Payment Type', 'Amount']],
+                        head: [['Type de paiement', 'Montant']],
                         body: paymentsData,
                         startY: startY,
                         headStyles: { fillColor: [41, 128, 185] },
@@ -255,22 +258,26 @@ const OrderListPage = () => {
 
                 let startY = (doc as any).lastAutoTable.finalY + 15;
                 doc.setFontSize(12);
-                doc.text(`Products Subtotal: ${formatCurrency(productsSubtotal)}`, 196, startY, { align: 'right' });
+                doc.text(`Total Produits: ${productsSubtotal}€`, 14, startY, { align: 'left' });
                 startY += 7;
-                doc.text(`Services Subtotal: ${formatCurrency(servicesSubtotal)}`, 196, startY, { align: 'right' });
+                doc.text(`Total Service: ${servicesSubtotal}€`, 14, startY, { align: 'left' });
                 startY += 7;
 
                 if (order.remiseGlobale) {
-                    doc.text(`Order Discount: ${order.remiseGlobale}%`, 196, startY, { align: 'right' });
+                    doc.text(`Remise: ${order.remiseGlobale}`, 14, startY, { align: 'left' });
                     startY += 7;
                 }
                 totalPayments.then(total => { // totalPayments is a Promise
-                    doc.text(`Total Payments: ${formatCurrency(total)}`, 196, startY, { align: 'right' });
+                    doc.text(`Total: ${total}€`, 14, startY, { align: 'left' });
                     startY += 7;
-                    doc.setFontSize(14);
+                    doc.setFontSize(12);
                     doc.setFont('helvetica', 'bold');
                     const totalDue = calculateTotalDue(productsSubtotal, servicesSubtotal, total, order.remiseGlobale);
-                    doc.text(`Remaining Balance: ${totalDue}`, 196, startY, { align: 'right' });
+                    doc.text(`Reste à payer: ${totalDue}`, 14, startY, { align: 'left' });
+                    doc.setFont('helvetica', 'normal');
+                    startY += 7;
+                    doc.setFontSize(11);
+                    doc.text(`Tva non applicable art 293 B.`, 14, startY, { align: 'left' });
                     doc.setFont('helvetica', 'normal');
                     doc.setFontSize(10);
                     doc.text("Merci pour votre visite!", 105, 280, { align: 'center' });
@@ -522,7 +529,7 @@ const OrderListPage = () => {
                                                                                                     <TableRow key={item.produit._id}>
                                                                                                         <TableCell>{item.produit.nom}</TableCell>
                                                                                                         <TableCell className="text-right">{item.quantite}</TableCell>
-                                                                                                        <TableCell className="text-right">{formatCurrency(item.prix)}</TableCell>
+                                                                                                        <TableCell className="text-right">{formatCurrency(item.produit.prix)}</TableCell>
                                                                                                         <TableCell className="text-right">{item.remise}%</TableCell>
                                                                                                         <TableCell className="text-right">
                                                                                                             {formatCurrency(item.produit.prix * item.quantite * (1 - (item.remise) / 100))}
@@ -555,10 +562,10 @@ const OrderListPage = () => {
                                                                                                 {selectedOrder.services?.map((item) => (
                                                                                                     <TableRow key={item.service._id}>
                                                                                                         <TableCell>{item.service.nom}</TableCell>
-                                                                                                        <TableCell className="text-right">{formatCurrency(item.prix)}</TableCell>
+                                                                                                        <TableCell className="text-right">{formatCurrency(item.service.prix)}</TableCell>
                                                                                                         <TableCell className="text-right">{item.remise}%</TableCell>
                                                                                                         <TableCell className="text-right">
-                                                                                                            {formatCurrency(item.prix -item.remise)}
+                                                                                                            {formatCurrency(item.service.prix * (1 - (item.remise) / 100))}
                                                                                                         </TableCell>
                                                                                                     </TableRow>
                                                                                                 ))}
@@ -660,7 +667,29 @@ const OrderListPage = () => {
                                                                 <Printer className="h-4 w-4" />
                                                             </Button>
 
-                                                           
+                                                            <Dialog>
+                                                                <DialogTrigger asChild>
+                                                                    <Button variant="destructive" size="icon" title="Supprimer la commande">
+                                                                        <Trash2 className='h-4 w-4' />
+                                                                    </Button>
+                                                                </DialogTrigger>
+                                                                <DialogContent>
+                                                                    <DialogHeader>
+                                                                        <DialogTitle>Êtes-vous sûr(e) ?</DialogTitle>
+                                                                        <DialogDescription>
+                                                                            Voulez-vous vraiment supprimer cette commande ?  Cette action est irréversible.
+                                                                        </DialogDescription>
+                                                                    </DialogHeader>
+                                                                    <DialogFooter>
+                                                                        <DialogClose asChild>
+                                                                            <Button variant="secondary">Cancel</Button>
+                                                                        </DialogClose>
+                                                                        <Button variant="destructive" onClick={() => deleteOrder(order._id)}>
+                                                                            Delete
+                                                                        </Button>
+                                                                    </DialogFooter>
+                                                                </DialogContent>
+                                                            </Dialog>
                                                         </TableCell>
                                                     </TableRow>
                                                 );
