@@ -203,7 +203,7 @@ const OrderListPage = () => {
                 item.service.nom,
                 item.prix,
                 `${item.remise}`,
-                (item.service.prix - (item.remise || 0)) // Total for service
+                (item.prix - (item.remise || 0)) // Total for service
             ]);
             const serviceColumns = ["Service", "Prix", "Remise", "Total"];
 
