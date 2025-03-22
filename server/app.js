@@ -9,6 +9,7 @@ connectDB()
 // Middleware
 app.use(cors())
 app.use(express.json());
+const Caisse = require('../models/caisseModel');
 const clientRoutes = require('./src/routes/clientRoutes');
 const produitRoutes = require('./src/routes/produitRoutes');
 const commandeRoutes = require('./src/routes/commandeRoutes');
@@ -17,7 +18,6 @@ const paiementRoutes = require('./src/routes/paiementRoutes');
 const caisseRoutes = require('./src/routes/caisseRoutes');
 const auth=require('./src/routes/authRoutes')
 const transactionRoutes = require('./src/routes/transactionRoutes');
-const tran=require('./src/controllers/caisseController')
 const servie =require('./src/routes/serviceRoutes')
 
 // Fonction pour ouvrir la caisse
@@ -33,17 +33,41 @@ function fermerCaisse() {
 }
 
 // Planifier l'ouverture de la caisse à 8h00 chaque jour
-cron.schedule('5 00 00 * * *', () => {
-    tran.ouvrirCaisse()
-    console.log('La caisse est ouverte à', new Date().toLocaleTimeString());
+cron.schedule('5 40 12 * * *', async () => {
+       try {
+           const isCaisse=await Caisse.findOne().sort({dateOuverture:-1})
+           if(!isCaisse){
+               const newCaisse=await Caisse.create({soldeinitiale:0,soldefinale:0})
+               console.log('La caisse est ouverte à', new Date().toLocaleTimeString());
+              return res.status(201).json(newCaisse)
+           }
+   
+           const newCaisse=await Caisse.create({soldeinitiale:isCaisse.soldefinale,soldefinale:isCaisse.soldefinale})
+              return res.status(201).json(newCaisse) 
+       } catch (error) {
+           
+       }
+    
 }, {
     timezone: "Europe/Paris" // Remplacez par votre fuseau horaire
 });
 
 // Planifier la fermeture de la caisse à 18h00 chaque jour
-cron.schedule('0 00 00 * * *', () => {
-    tran.fermeCaisse();
-    console.log('La caisse est FERME  à', new Date().toLocaleTimeString());
+cron.schedule('0 40 12 * * *', async() => {
+        try {
+            const isCaisse=await Caisse.findOne({isOpen:true})
+            if(!isCaisse){
+                console.log('La caisse est FERME  à', new Date().toLocaleTimeString()); 
+               return res.status(201).json({message:'caisse not found'})
+            }
+            isCaisse.isOpen=false
+            isCaisse.save()
+            
+               return res.status(201).json(isCaisse)
+        } catch (error) {
+            
+        }
+    
 }, {
     timezone: "Europe/Paris" // Remplacez par votre fuseau horaire
 });
