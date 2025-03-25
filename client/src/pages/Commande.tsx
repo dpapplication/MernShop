@@ -239,7 +239,7 @@ const OrderListPage = () => {
                     startY += 7;
                     const paymentsData = payments.map((payment) => [
                         payment.methode,
-                        payment.montant, // format currency
+                        `${payment.montant}€`, // format currency
                     ]);
 
                     autoTable(doc, {
