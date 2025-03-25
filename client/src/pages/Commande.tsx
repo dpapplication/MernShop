@@ -175,9 +175,9 @@ const OrderListPage = () => {
         const productItems = order.produits?.map((item) => [
             item.produit.nom,
             item.quantite,
-            item.prix,
+            `${item.prix}€`,
             `${item.remise}`,
-            (item.prix * item.quantite - (item.remise || 0))
+            `${(item.prix * item.quantite - (item.remise || 0))}€`
         ]) || [];
 
         const productColumns = ["Produit", "Quantité", "Prix Unitaire", "Remise", "Total"];
@@ -201,9 +201,9 @@ const OrderListPage = () => {
         if (order.services && order.services.length > 0) {
             const serviceItems = order.services.map(item => [
                 item.service.nom,
-                item.prix,
-                `${item.remise}`,
-                (item.prix - (item.remise || 0)) // Total for service
+                `${item.prix}€`,
+            `${item.remise}`,
+            `${(item.prix - (item.remise || 0))}€`
             ]);
             const serviceColumns = ["Service", "Prix", "Remise", "Total"];
 
