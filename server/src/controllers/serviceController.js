@@ -1,7 +1,7 @@
-import Service from "../models/serviceModel.js";
+const Service =require("../models/serviceModel.js") ;
 
 // Get all services
-export const getAllServices = async (req, res) => {
+module.exports.getAllServices = async (req, res) => {
     try {
         const services = await Service.find({});
         res.status(200).json(services);
@@ -11,7 +11,7 @@ export const getAllServices = async (req, res) => {
 };
 
 // Create a new service
-export const createService = async (req, res) => {
+module.exports.createService = async (req, res) => {
     try {
         const { nom, prix } = req.body;
 
@@ -31,7 +31,7 @@ export const createService = async (req, res) => {
 };
 
 // Get a service by ID
-export const getServiceById = async (req, res) => {
+module.exports.getServiceById = async (req, res) => {
     try {
         const { id } = req.params; // Get ID from route parameters
         if (!id) {
@@ -49,7 +49,7 @@ export const getServiceById = async (req, res) => {
 };
 
 // Update a service
-export const updateService = async (req, res) => {
+module.exports.updateService = async (req, res) => {
     try {
         const { id } = req.params; // Get ID from route parameters
 
@@ -84,7 +84,7 @@ export const updateService = async (req, res) => {
 };
 
 // Delete a service
-export const deleteService = async (req, res) => {
+module.exports.deleteService = async (req, res) => {
     try {
         const { id } = req.params; // Get ID from route parameters
         if (!id) {

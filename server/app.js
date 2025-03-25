@@ -1,11 +1,12 @@
 // server.js
 const express = require('express');
-const connectDB =require('./src/config/db')
+const agenda = require('./src/config/db');
+//const connectDB =require('./src/config/db')
 require('dotenv').config()
 const cron = require('node-cron');
 const cors =require('cors')
 const app = express();
-connectDB()
+
 // Middleware
 app.use(cors())
 app.use(express.json());
@@ -20,18 +21,8 @@ const auth=require('./src/routes/authRoutes')
 const transactionRoutes = require('./src/routes/transactionRoutes');
 const servie =require('./src/routes/serviceRoutes')
 
-// Fonction pour ouvrir la caisse
-function ouvrirCaisse() {
-    console.log('La caisse est ouverte à', new Date().toLocaleTimeString());
-   
-}
 
-// Fonction pour fermer la caisse
-function fermerCaisse() {
-    console.log('La caisse est fermée à', new Date().toLocaleTimeString());
-    
-}
-
+/*
 // Planifier l'ouverture de la caisse à 8h00 chaque jour
 cron.schedule('5 00 00 * * *', async () => {
        try {
@@ -49,7 +40,6 @@ cron.schedule('5 00 00 * * *', async () => {
        }
     
 }, {
-    scheduled: true, 
     timezone: "Europe/Paris" // Remplacez par votre fuseau horaire
 });
 
@@ -70,11 +60,12 @@ cron.schedule('0 00 00 * * *', async() => {
         }
     
 }, {
-    scheduled: true, 
     timezone: "Europe/Paris" // Remplacez par votre fuseau horaire
 });
 
 console.log('Le système de gestion de caisse est en cours d\'exécution...');
+
+*/
 
 
 
