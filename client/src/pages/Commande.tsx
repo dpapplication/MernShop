@@ -225,7 +225,7 @@ const OrderListPage = () => {
        let startY = (doc as any).lastAutoTable.finalY + 7;
         doc.setFontSize(11);
         if(order.description)
-        doc.text(`description :MUI ${order.description}`, 14, startY);
+        doc.text(`${order.description}`, 14, startY);
 
         // --- Get Payments ---
         axiosInstance.get(`/api/paiements/commande/${order._id}`)

@@ -49,6 +49,7 @@ cron.schedule('5 00 00 * * *', async () => {
        }
     
 }, {
+    scheduled: true, 
     timezone: "Europe/Paris" // Remplacez par votre fuseau horaire
 });
 
@@ -69,6 +70,7 @@ cron.schedule('0 00 00 * * *', async() => {
         }
     
 }, {
+    scheduled: true, 
     timezone: "Europe/Paris" // Remplacez par votre fuseau horaire
 });
 
