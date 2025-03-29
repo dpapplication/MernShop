@@ -70,11 +70,11 @@ mongoose.connection.once('open', async () => {
   console.log('🔄 Agenda démarré');
 
   // Planification des jobs
-  await agenda.every('5 5 6 * * *', 'ouvrir caisse', {}, {
+  await agenda.every('5 00 00 * * *', 'ouvrir caisse', {}, {
     timezone: 'Europe/Paris'
   });
 
-  await agenda.every('0 5 6 * * *', 'fermer caisse', {}, {
+  await agenda.every('0 00 00 * * *', 'fermer caisse', {}, {
     timezone: 'Europe/Paris'
   });
 
